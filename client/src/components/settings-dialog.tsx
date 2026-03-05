@@ -54,7 +54,7 @@ function BasemapCard({ basemap, onUpdate, onDelete, onSetDefault }: {
   const needsApiKey = basemap.provider !== "osm";
 
   return (
-    <div className={`border rounded-lg p-3 space-y-3 transition-colors ${basemap.enabled ? "border-border" : "border-border/50 opacity-60"}`}
+    <div className={`border rounded-lg p-3 space-y-3 transition-colors min-w-0 overflow-hidden ${basemap.enabled ? "border-border" : "border-border/50 opacity-60"}`}
       data-testid={`basemap-card-${basemap.id}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -129,11 +129,11 @@ function BasemapCard({ basemap, onUpdate, onDelete, onSetDefault }: {
       )}
 
       {basemap.urlTemplate && (
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-0">
           <Label className="text-[11px] text-muted-foreground">타일 URL 템플릿</Label>
           <Input
             value={basemap.urlTemplate}
-            className="text-[11px] h-7 font-mono bg-muted/50"
+            className="text-[11px] h-7 font-mono bg-muted/50 w-full"
             onChange={(e) => onUpdate(basemap.id, { urlTemplate: e.target.value })}
             data-testid={`input-url-template-${basemap.id}`}
           />
@@ -340,7 +340,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="settings-dialog">
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="settings-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Monitor className="w-5 h-5" />
@@ -365,7 +365,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 overflow-y-auto mt-4">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden mt-4">
             <TabsContent value="basemaps" className="mt-0 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
