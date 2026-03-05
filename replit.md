@@ -33,7 +33,7 @@ Enterprise GIS solution for large-scale spatial data management following the La
 - `server/seed.ts` - Seed data (Seoul: 200 facilities, 30 roads, 5 admin zones, default basemaps, default settings)
 - `client/src/App.tsx` - Main app with sidebar + map layout + settings dialog
 - `client/src/components/map-viewer.tsx` - OpenLayers map component with basemap switching
-- `client/src/components/app-sidebar.tsx` - Layer management sidebar with settings button
+- `client/src/components/app-sidebar.tsx` - Layer management sidebar with basemap group and settings button
 - `client/src/components/settings-dialog.tsx` - Settings dialog (basemap management, rendering settings, map settings)
 - `client/src/components/add-layer-dialog.tsx` - New layer creation dialog
 - `client/src/components/radius-search-panel.tsx` - Radius search tool

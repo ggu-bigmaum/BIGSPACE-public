@@ -18,7 +18,7 @@ import type { Layer, Feature, Basemap } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCoordinate } from "@/lib/mapUtils";
-import { Globe, ChevronDown } from "lucide-react";
+import { Globe, ChevronDown, AlertTriangle } from "lucide-react";
 
 interface MapViewerProps {
   layers: Layer[];
@@ -32,25 +32,34 @@ interface MapViewerProps {
   searchResults?: any | null;
 }
 
-function createTileSource(basemap: Basemap) {
+function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string | null } {
+  if (basemap.provider === "osm" && basemap.urlTemplate === "https://tile.openstreetmap.org/{z}/{x}/{y}.png") {
+    return { source: new OSM(), error: null };
+  }
+
   if (basemap.provider === "osm" && !basemap.urlTemplate) {
-    return new OSM();
+    return { source: new OSM(), error: null };
   }
 
   let url = basemap.urlTemplate;
-  if (basemap.apiKey && url.includes("{apiKey}")) {
+  if (!url) {
+    return { source: new OSM(), error: `${basemap.name}: 타일 URL이 설정되지 않았습니다. 설정에서 URL 템플릿을 입력하세요.` };
+  }
+
+  if (url.includes("{apiKey}")) {
+    if (!basemap.apiKey) {
+      return { source: new OSM(), error: `${basemap.name}: API 키가 입력되지 않았습니다. 설정에서 API 키를 입력하세요.` };
+    }
     url = url.replace("{apiKey}", basemap.apiKey);
   }
 
-  if (!url) {
-    return new OSM();
-  }
-
-  return new XYZ({
+  const xyzSource = new XYZ({
     url,
     maxZoom: basemap.maxZoom,
     attributions: basemap.attribution || undefined,
   });
+
+  return { source: xyzSource, error: null };
 }
 
 const geojsonFormat = new GeoJSON();
@@ -119,6 +128,8 @@ export function MapViewer({
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
   const [basemapSelectorOpen, setBasemapSelectorOpen] = useState(false);
   const [activeBasemapId, setActiveBasemapId] = useState<string | null>(null);
+  const [basemapError, setBasemapError] = useState<string | null>(null);
+  const tileErrorCountRef = useRef(0);
 
   const { data: basemapList = [] } = useQuery<Basemap[]>({
     queryKey: ["/api/basemaps"],
@@ -244,8 +255,35 @@ export function MapViewer({
 
   useEffect(() => {
     if (!baseTileLayerRef.current || !activeBasemap) return;
-    const newSource = createTileSource(activeBasemap);
-    baseTileLayerRef.current.setSource(newSource);
+    const { source, error } = createTileSource(activeBasemap);
+    setBasemapError(error);
+    tileErrorCountRef.current = 0;
+
+    if (source instanceof XYZ && !(source instanceof OSM)) {
+      const onTileError = () => {
+        tileErrorCountRef.current++;
+        if (tileErrorCountRef.current === 3) {
+          setBasemapError(`${activeBasemap.name}: 타일 로드 실패. URL 또는 API 키를 확인하세요.`);
+        }
+      };
+      const onTileLoad = () => {
+        if (tileErrorCountRef.current >= 3) {
+          tileErrorCountRef.current = 0;
+          setBasemapError(null);
+        }
+      };
+      source.on("tileloaderror", onTileError);
+      source.on("tileloadend", onTileLoad);
+
+      baseTileLayerRef.current.setSource(source);
+
+      return () => {
+        source.un("tileloaderror", onTileError);
+        source.un("tileloadend", onTileLoad);
+      };
+    }
+
+    baseTileLayerRef.current.setSource(source);
   }, [activeBasemap]);
 
   const shouldUseAggregate = useCallback((layer: Layer, zoom: number): boolean => {
@@ -404,6 +442,18 @@ export function MapViewer({
   return (
     <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full" data-testid="map-container" />
+
+      {basemapError && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 max-w-md" data-testid="basemap-error">
+          <div className="bg-destructive/90 text-destructive-foreground backdrop-blur-sm rounded-md px-4 py-2.5 shadow-lg flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-medium">배경 지도 오류</p>
+              <p className="text-[11px] mt-0.5 opacity-90">{basemapError}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
         <div className="bg-card/90 backdrop-blur-sm border border-card-border rounded-md px-3 py-1.5 flex items-center gap-2">

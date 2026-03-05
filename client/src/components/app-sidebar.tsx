@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Layer } from "@shared/schema";
+import type { Layer, Basemap } from "@shared/schema";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Layers, Plus, Eye, EyeOff, Circle, Route, Square, Trash2,
-  Map, Database, Search, Activity, ChevronDown, ChevronRight, Settings2, Globe,
+  Map, Database, Search, Activity, ChevronDown, ChevronRight, Settings2, Globe, Star,
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -58,8 +58,29 @@ export function AppSidebar({
     queryKey: ["/api/layers"],
   });
 
+  const { data: basemapList = [] } = useQuery<Basemap[]>({
+    queryKey: ["/api/basemaps"],
+  });
+
   const { data: stats } = useQuery<{ layerCount: number; totalFeatures: number }>({
     queryKey: ["/api/stats"],
+  });
+
+  const enabledBasemaps = basemapList.filter(b => b.enabled);
+
+  const toggleBasemapMutation = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      if (!enabled && enabledBasemaps.length <= 1) {
+        throw new Error("최소 하나의 배경 지도가 활성화되어 있어야 합니다.");
+      }
+      await apiRequest("PATCH", `/api/basemaps/${id}`, { enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/basemaps"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "배경 지도 오류", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -110,7 +131,7 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="overflow-y-auto scrollbar-none">
         <SidebarGroup>
           <div className="flex items-center justify-between gap-1 px-2">
             <SidebarGroupLabel className="px-0">
@@ -240,6 +261,45 @@ export function AppSidebar({
                   </div>
                 </SidebarMenuItem>
               )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <Separator className="mx-2" />
+
+        <SidebarGroup>
+          <SidebarGroupLabel>
+            <Globe className="w-3.5 h-3.5 mr-1.5" />
+            Background Maps
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {basemapList.map((bm) => (
+                <SidebarMenuItem key={bm.id}>
+                  <div className="flex items-center gap-2 px-2 py-1">
+                    <button
+                      onClick={() => toggleBasemapMutation.mutate({ id: bm.id, enabled: !bm.enabled })}
+                      className="p-0.5"
+                      data-testid={`button-toggle-basemap-${bm.id}`}
+                    >
+                      {bm.enabled ? (
+                        <Eye className="w-3.5 h-3.5 text-primary" />
+                      ) : (
+                        <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                      )}
+                    </button>
+                    <span
+                      className={`text-xs flex-1 truncate ${bm.enabled ? "" : "text-muted-foreground"}`}
+                      data-testid={`text-basemap-name-${bm.id}`}
+                    >
+                      {bm.name}
+                    </span>
+                    {bm.isDefault && (
+                      <Star className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                    )}
+                  </div>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
