@@ -3,10 +3,12 @@ import {
   type Layer, type InsertLayer,
   type Feature, type InsertFeature,
   type SpatialQuery, type InsertSpatialQuery,
-  users, layers, features, spatialQueries,
+  type Basemap, type InsertBasemap,
+  type AppSetting, type InsertAppSetting,
+  users, layers, features, spatialQueries, basemaps, appSettings,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -32,6 +34,17 @@ export interface IStorage {
 
   createSpatialQuery(query: InsertSpatialQuery): Promise<SpatialQuery>;
   getSpatialQueries(): Promise<SpatialQuery[]>;
+
+  getBasemaps(): Promise<Basemap[]>;
+  getBasemap(id: string): Promise<Basemap | undefined>;
+  createBasemap(basemap: InsertBasemap): Promise<Basemap>;
+  updateBasemap(id: string, updates: Partial<InsertBasemap>): Promise<Basemap | undefined>;
+  deleteBasemap(id: string): Promise<boolean>;
+  setDefaultBasemap(id: string): Promise<void>;
+
+  getSettings(category?: string): Promise<AppSetting[]>;
+  getSetting(key: string): Promise<AppSetting | undefined>;
+  upsertSetting(setting: InsertAppSetting): Promise<AppSetting>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -243,6 +256,59 @@ export class DatabaseStorage implements IStorage {
     if (geom.type === "MultiLineString" || geom.type === "Polygon") return geom.coordinates.flat();
     if (geom.type === "MultiPolygon") return geom.coordinates.flat(2);
     return [];
+  }
+
+  async getBasemaps(): Promise<Basemap[]> {
+    return db.select().from(basemaps).orderBy(asc(basemaps.sortOrder));
+  }
+
+  async getBasemap(id: string): Promise<Basemap | undefined> {
+    const [basemap] = await db.select().from(basemaps).where(eq(basemaps.id, id));
+    return basemap || undefined;
+  }
+
+  async createBasemap(basemap: InsertBasemap): Promise<Basemap> {
+    const [created] = await db.insert(basemaps).values(basemap).returning();
+    return created;
+  }
+
+  async updateBasemap(id: string, updates: Partial<InsertBasemap>): Promise<Basemap | undefined> {
+    const [updated] = await db.update(basemaps).set(updates).where(eq(basemaps.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteBasemap(id: string): Promise<boolean> {
+    const result = await db.delete(basemaps).where(eq(basemaps.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async setDefaultBasemap(id: string): Promise<void> {
+    await db.update(basemaps).set({ isDefault: false });
+    await db.update(basemaps).set({ isDefault: true }).where(eq(basemaps.id, id));
+  }
+
+  async getSettings(category?: string): Promise<AppSetting[]> {
+    if (category) {
+      return db.select().from(appSettings).where(eq(appSettings.category, category));
+    }
+    return db.select().from(appSettings);
+  }
+
+  async getSetting(key: string): Promise<AppSetting | undefined> {
+    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    return setting || undefined;
+  }
+
+  async upsertSetting(setting: InsertAppSetting): Promise<AppSetting> {
+    const [result] = await db
+      .insert(appSettings)
+      .values(setting)
+      .onConflictDoUpdate({
+        target: appSettings.key,
+        set: { value: setting.value, description: setting.description, category: setting.category },
+      })
+      .returning();
+    return result;
   }
 
   private async updateLayerStats(layerId: string): Promise<void> {

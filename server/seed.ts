@@ -1,8 +1,156 @@
 import { storage } from "./storage";
 import { db } from "./db";
-import { layers } from "@shared/schema";
+import { layers, basemaps } from "@shared/schema";
+
+async function seedBasemaps() {
+  const existing = await storage.getBasemaps();
+  if (existing.length > 0) return;
+
+  console.log("Seeding default basemaps...");
+
+  await storage.createBasemap({
+    name: "OpenStreetMap",
+    provider: "osm",
+    urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    enabled: true,
+    isDefault: true,
+    sortOrder: 0,
+    attribution: "© OpenStreetMap contributors",
+    maxZoom: 19,
+    description: "전 세계 오픈소스 지도. API 키 불필요.",
+  });
+
+  await storage.createBasemap({
+    name: "VWorld 기본지도",
+    provider: "vworld",
+    urlTemplate: "https://api.vworld.kr/req/wmts/1.0.0/{apiKey}/Base/{z}/{y}/{x}.png",
+    apiKey: "",
+    enabled: false,
+    isDefault: false,
+    sortOrder: 1,
+    attribution: "© VWorld (국토정보플랫폼)",
+    maxZoom: 18,
+    description: "국토교통부 제공 기본지도. api.vworld.kr에서 API 키 발급 필요.",
+  });
+
+  await storage.createBasemap({
+    name: "VWorld 위성지도",
+    provider: "vworld",
+    urlTemplate: "https://api.vworld.kr/req/wmts/1.0.0/{apiKey}/Satellite/{z}/{y}/{x}.jpeg",
+    apiKey: "",
+    enabled: false,
+    isDefault: false,
+    sortOrder: 2,
+    attribution: "© VWorld (국토정보플랫폼)",
+    maxZoom: 18,
+    description: "VWorld 위성영상 지도. 동일한 VWorld API 키 사용.",
+  });
+
+  await storage.createBasemap({
+    name: "Naver Map",
+    provider: "naver",
+    urlTemplate: "",
+    apiKey: "",
+    enabled: false,
+    isDefault: false,
+    sortOrder: 3,
+    attribution: "© Naver Corp.",
+    maxZoom: 21,
+    description: "네이버 지도. developers.naver.com에서 Client ID 발급 필요. 네이버 지도 SDK는 별도 연동이 필요합니다.",
+  });
+
+  await storage.createBasemap({
+    name: "Kakao Map",
+    provider: "kakao",
+    urlTemplate: "",
+    apiKey: "",
+    enabled: false,
+    isDefault: false,
+    sortOrder: 4,
+    attribution: "© Kakao Corp.",
+    maxZoom: 21,
+    description: "카카오 지도. developers.kakao.com에서 JavaScript 키 발급 필요. 카카오 지도 SDK는 별도 연동이 필요합니다.",
+  });
+
+  console.log("Basemaps seeded: OSM (default), VWorld, Naver, Kakao");
+}
+
+async function seedSettings() {
+  const existing = await storage.getSettings();
+  if (existing.length > 0) return;
+
+  console.log("Seeding default settings...");
+
+  await storage.upsertSetting({
+    key: "rendering.defaultRenderMode",
+    value: "auto",
+    description: "기본 렌더링 모드. auto: 줌 레벨에 따라 자동 전환 | feature: 항상 개별 피처 표시 | tile: 타일 기반 표시 | aggregate: 집계 클러스터만 표시",
+    category: "rendering",
+  });
+
+  await storage.upsertSetting({
+    key: "rendering.defaultFeatureLimit",
+    value: 2000,
+    description: "한 번에 로드할 최대 피처 수. 값이 클수록 상세하지만 성능이 저하됩니다. 권장: 1000~5000",
+    category: "rendering",
+  });
+
+  await storage.upsertSetting({
+    key: "rendering.defaultMinZoomForFeatures",
+    value: 15,
+    description: "개별 피처를 표시하는 최소 줌 레벨. 이보다 낮은 줌에서는 집계/클러스터로 표시됩니다. 범위: 0~20",
+    category: "rendering",
+  });
+
+  await storage.upsertSetting({
+    key: "rendering.aggregateGridSize",
+    value: 20,
+    description: "저줌 집계(aggregate) 시 그리드 분할 수. 값이 클수록 촘촘한 집계. 권장: 10~40",
+    category: "rendering",
+  });
+
+  await storage.upsertSetting({
+    key: "rendering.debounceMs",
+    value: 300,
+    description: "지도 이동/줌 시 데이터 요청 디바운스 시간(ms). 값이 작으면 반응이 빠르지만 서버 부하가 증가합니다. 권장: 200~500",
+    category: "rendering",
+  });
+
+  await storage.upsertSetting({
+    key: "map.defaultCenter",
+    value: [126.978, 37.5665],
+    description: "지도 초기 중심 좌표 [경도, 위도]. 서울: [126.978, 37.5665]",
+    category: "map",
+  });
+
+  await storage.upsertSetting({
+    key: "map.defaultZoom",
+    value: 11,
+    description: "지도 초기 줌 레벨. 범위: 2~20. 도시 전체 보기: 11, 구/동 단위: 14~15",
+    category: "map",
+  });
+
+  await storage.upsertSetting({
+    key: "map.maxZoom",
+    value: 20,
+    description: "최대 줌 레벨. 범위: 15~22",
+    category: "map",
+  });
+
+  await storage.upsertSetting({
+    key: "map.minZoom",
+    value: 2,
+    description: "최소 줌 레벨. 범위: 0~10",
+    category: "map",
+  });
+
+  console.log("Default settings seeded");
+}
 
 export async function seedDatabase() {
+  await seedBasemaps();
+  await seedSettings();
+
   const existingLayers = await storage.getLayers();
   if (existingLayers.length > 0) return;
 

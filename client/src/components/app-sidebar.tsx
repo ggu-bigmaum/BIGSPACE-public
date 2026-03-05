@@ -31,6 +31,7 @@ interface AppSidebarProps {
   onLayerSelect?: (layerId: string | null) => void;
   onAddLayer?: () => void;
   onToolSelect?: (tool: string) => void;
+  onSettingsOpen?: () => void;
   selectedLayerId?: string | null;
   activeTool?: string;
 }
@@ -46,6 +47,7 @@ export function AppSidebar({
   onLayerSelect,
   onAddLayer,
   onToolSelect,
+  onSettingsOpen,
   selectedLayerId,
   activeTool,
 }: AppSidebarProps) {
@@ -269,7 +271,17 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-3 space-y-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-xs h-8"
+          onClick={onSettingsOpen}
+          data-testid="button-open-settings"
+        >
+          <Settings2 className="w-3.5 h-3.5 mr-2" />
+          설정
+        </Button>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           <Database className="w-3 h-3" />
           <span>

@@ -81,6 +81,40 @@ export const insertFeatureSchema = createInsertSchema(features).omit({
 export type InsertFeature = z.infer<typeof insertFeatureSchema>;
 export type Feature = typeof features.$inferSelect;
 
+export const basemaps = pgTable("basemaps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  provider: text("provider").notNull(),
+  urlTemplate: text("url_template").notNull(),
+  apiKey: text("api_key"),
+  enabled: boolean("enabled").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  attribution: text("attribution"),
+  maxZoom: integer("max_zoom").notNull().default(18),
+  subdomains: text("subdomains"),
+  description: text("description"),
+});
+
+export const insertBasemapSchema = createInsertSchema(basemaps).omit({
+  id: true,
+});
+
+export type InsertBasemap = z.infer<typeof insertBasemapSchema>;
+export type Basemap = typeof basemaps.$inferSelect;
+
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("general"),
+});
+
+export const insertAppSettingSchema = createInsertSchema(appSettings);
+
+export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
+export type AppSetting = typeof appSettings.$inferSelect;
+
 export const spatialQueries = pgTable("spatial_queries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),

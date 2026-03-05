@@ -6,8 +6,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { AddLayerDialog } from "@/components/add-layer-dialog";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { Button } from "@/components/ui/button";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Settings } from "lucide-react";
 import MapPage from "@/pages/map-page";
 import { useState } from "react";
 
@@ -24,6 +25,7 @@ function AppLayout() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState("select");
   const [addLayerDialogOpen, setAddLayerDialogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const style = {
     "--sidebar-width": "18rem",
@@ -38,6 +40,7 @@ function AppLayout() {
           onLayerSelect={setSelectedLayerId}
           onAddLayer={() => setAddLayerDialogOpen(true)}
           onToolSelect={setActiveTool}
+          onSettingsOpen={() => setSettingsOpen(true)}
           selectedLayerId={selectedLayerId}
           activeTool={activeTool}
         />
@@ -47,7 +50,17 @@ function AppLayout() {
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <span className="text-sm font-medium text-muted-foreground hidden sm:inline">GIS Workspace</span>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setSettingsOpen(true)}
+                data-testid="button-settings"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+              <ThemeToggle />
+            </div>
           </header>
           <main className="flex-1 overflow-hidden relative">
             <MapPage
@@ -58,6 +71,7 @@ function AppLayout() {
         </div>
       </div>
       <AddLayerDialog open={addLayerDialogOpen} onOpenChange={setAddLayerDialogOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </SidebarProvider>
   );
 }

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertLayerSchema, insertFeatureSchema } from "@shared/schema";
+import { insertLayerSchema, insertFeatureSchema, insertBasemapSchema, insertAppSettingSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(
@@ -155,6 +155,74 @@ export async function registerRoutes(
   app.get("/api/spatial/history", async (_req, res) => {
     const queries = await storage.getSpatialQueries();
     res.json(queries);
+  });
+
+  // Basemap CRUD
+  app.get("/api/basemaps", async (_req, res) => {
+    const list = await storage.getBasemaps();
+    res.json(list);
+  });
+
+  app.post("/api/basemaps", async (req, res) => {
+    try {
+      const data = insertBasemapSchema.parse(req.body);
+      const basemap = await storage.createBasemap(data);
+      res.status(201).json(basemap);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/basemaps/:id", async (req, res) => {
+    try {
+      const allowedFields = insertBasemapSchema.partial().parse(req.body);
+      const basemap = await storage.updateBasemap(req.params.id, allowedFields);
+      if (!basemap) return res.status(404).json({ message: "Basemap not found" });
+      res.json(basemap);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/basemaps/:id", async (req, res) => {
+    const ok = await storage.deleteBasemap(req.params.id);
+    if (!ok) return res.status(404).json({ message: "Basemap not found" });
+    res.json({ success: true });
+  });
+
+  app.post("/api/basemaps/:id/default", async (req, res) => {
+    await storage.setDefaultBasemap(req.params.id);
+    res.json({ success: true });
+  });
+
+  // App settings
+  app.get("/api/settings", async (req, res) => {
+    const category = req.query.category as string | undefined;
+    const settings = await storage.getSettings(category);
+    res.json(settings);
+  });
+
+  app.get("/api/settings/:key", async (req, res) => {
+    const setting = await storage.getSetting(req.params.key);
+    if (!setting) return res.status(404).json({ message: "Setting not found" });
+    res.json(setting);
+  });
+
+  app.put("/api/settings/:key", async (req, res) => {
+    try {
+      if (req.body.value === undefined) {
+        return res.status(400).json({ message: "value is required" });
+      }
+      const setting = await storage.upsertSetting({
+        key: req.params.key,
+        value: req.body.value,
+        description: req.body.description,
+        category: req.body.category || "general",
+      });
+      res.json(setting);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
   });
 
   // Stats endpoint

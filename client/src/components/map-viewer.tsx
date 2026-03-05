@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import OlMap from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import OSM from "ol/source/OSM";
+import XYZ from "ol/source/XYZ";
 import GeoJSON from "ol/format/GeoJSON";
 import { fromLonLat, toLonLat } from "ol/proj";
 import { Style, Fill, Stroke, Circle as CircleStyle, Text as TextStyle } from "ol/style";
@@ -12,9 +14,11 @@ import { Feature as OlFeature } from "ol";
 import { Point, Circle as CircleGeom } from "ol/geom";
 import Overlay from "ol/Overlay";
 import { defaults as defaultControls } from "ol/control";
-import type { Layer, Feature } from "@shared/schema";
+import type { Layer, Feature, Basemap } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatCoordinate } from "@/lib/mapUtils";
+import { Globe, ChevronDown } from "lucide-react";
 
 interface MapViewerProps {
   layers: Layer[];
@@ -26,6 +30,27 @@ interface MapViewerProps {
   radiusCenter?: { lng: number; lat: number } | null;
   radiusKm?: number;
   searchResults?: any | null;
+}
+
+function createTileSource(basemap: Basemap) {
+  if (basemap.provider === "osm" && !basemap.urlTemplate) {
+    return new OSM();
+  }
+
+  let url = basemap.urlTemplate;
+  if (basemap.apiKey && url.includes("{apiKey}")) {
+    url = url.replace("{apiKey}", basemap.apiKey);
+  }
+
+  if (!url) {
+    return new OSM();
+  }
+
+  return new XYZ({
+    url,
+    maxZoom: basemap.maxZoom,
+    attributions: basemap.attribution || undefined,
+  });
 }
 
 const geojsonFormat = new GeoJSON();
@@ -83,6 +108,7 @@ export function MapViewer({
 }: MapViewerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<OlMap | null>(null);
+  const baseTileLayerRef = useRef<TileLayer | null>(null);
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
   const highlightLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const radiusLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
@@ -91,17 +117,30 @@ export function MapViewer({
   const [currentZoom, setCurrentZoom] = useState(11);
   const [cursorCoord, setCursorCoord] = useState<[number, number] | null>(null);
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
+  const [basemapSelectorOpen, setBasemapSelectorOpen] = useState(false);
+  const [activeBasemapId, setActiveBasemapId] = useState<string | null>(null);
+
+  const { data: basemapList = [] } = useQuery<Basemap[]>({
+    queryKey: ["/api/basemaps"],
+  });
+
+  const enabledBasemaps = basemapList.filter(b => b.enabled);
+  const activeBasemap = enabledBasemaps.find(b => b.id === activeBasemapId)
+    || enabledBasemaps.find(b => b.isDefault)
+    || enabledBasemaps[0];
 
   useEffect(() => {
     if (!mapRef.current) return;
 
+    const tileLayer = new TileLayer({
+      source: new OSM(),
+      zIndex: 0,
+    });
+    baseTileLayerRef.current = tileLayer;
+
     const map = new OlMap({
       target: mapRef.current,
-      layers: [
-        new TileLayer({
-          source: new OSM(),
-        }),
-      ],
+      layers: [tileLayer],
       view: new View({
         center: fromLonLat([126.978, 37.5665]),
         zoom: 11,
@@ -202,6 +241,12 @@ export function MapViewer({
       (target as HTMLElement).style.cursor = activeTool === "radius" ? "crosshair" : "default";
     }
   }, [activeTool]);
+
+  useEffect(() => {
+    if (!baseTileLayerRef.current || !activeBasemap) return;
+    const newSource = createTileSource(activeBasemap);
+    baseTileLayerRef.current.setSource(newSource);
+  }, [activeBasemap]);
 
   const shouldUseAggregate = useCallback((layer: Layer, zoom: number): boolean => {
     if (layer.renderMode === "aggregate") return true;
@@ -371,7 +416,45 @@ export function MapViewer({
         </div>
       </div>
 
-      <div className="absolute bottom-3 left-3 z-10">
+      <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-2">
+        {enabledBasemaps.length > 1 && (
+          <div className="relative">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-8 text-[11px] bg-card/90 backdrop-blur-sm border border-card-border shadow-sm"
+              onClick={() => setBasemapSelectorOpen(!basemapSelectorOpen)}
+              data-testid="button-basemap-selector"
+            >
+              <Globe className="w-3.5 h-3.5 mr-1.5" />
+              {activeBasemap?.name || "배경 지도"}
+              <ChevronDown className="w-3 h-3 ml-1" />
+            </Button>
+            {basemapSelectorOpen && (
+              <div className="absolute bottom-full left-0 mb-1 bg-card border border-card-border rounded-md shadow-lg min-w-[180px] py-1">
+                {enabledBasemaps.map((bm) => (
+                  <button
+                    key={bm.id}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-2 ${
+                      activeBasemap?.id === bm.id ? "bg-accent font-medium" : ""
+                    }`}
+                    onClick={() => {
+                      setActiveBasemapId(bm.id);
+                      setBasemapSelectorOpen(false);
+                    }}
+                    data-testid={`button-select-basemap-${bm.id}`}
+                  >
+                    <Globe className="w-3 h-3 text-muted-foreground" />
+                    {bm.name}
+                    {bm.isDefault && (
+                      <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 ml-auto">기본</Badge>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="bg-card/90 backdrop-blur-sm border border-card-border rounded-md px-3 py-1.5">
           <span className="text-[10px] text-muted-foreground">EPSG:3857 (Display) / EPSG:4326 (Data)</span>
         </div>
