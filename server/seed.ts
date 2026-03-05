@@ -9,11 +9,23 @@ async function seedBasemaps() {
   console.log("Seeding default basemaps...");
 
   await storage.createBasemap({
+    name: "위성 영상",
+    provider: "esri",
+    urlTemplate: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    enabled: true,
+    isDefault: true,
+    sortOrder: -1,
+    attribution: "© Esri, Maxar, Earthstar Geographics",
+    maxZoom: 19,
+    description: "ESRI 위성영상 지도. API 키 불필요.",
+  });
+
+  await storage.createBasemap({
     name: "OpenStreetMap",
     provider: "osm",
     urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     enabled: true,
-    isDefault: true,
+    isDefault: false,
     sortOrder: 0,
     attribution: "© OpenStreetMap contributors",
     maxZoom: 19,
@@ -72,7 +84,7 @@ async function seedBasemaps() {
     description: "카카오 지도. developers.kakao.com에서 JavaScript 키 발급 필요. 카카오 지도 SDK는 별도 연동이 필요합니다.",
   });
 
-  console.log("Basemaps seeded: OSM (default), VWorld, Naver, Kakao");
+  console.log("Basemaps seeded: ESRI Satellite (default), OSM, VWorld, Naver, Kakao");
 }
 
 async function seedSettings() {

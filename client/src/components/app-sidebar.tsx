@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Layer, Basemap } from "@shared/schema";
+import type { Layer } from "@shared/schema";
 import {
   Sidebar,
   SidebarContent,
@@ -9,89 +9,54 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton,
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Layers, Plus, Eye, EyeOff, Circle, Route, Square, Trash2,
-  Map, Database, Search, Activity, ChevronDown, ChevronRight, Settings2, Globe, Star,
+  Layers, Plus, Map, Download, Settings2, Globe, ChevronDown,
 } from "lucide-react";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 interface AppSidebarProps {
   onLayerToggle?: (layerId: string, visible: boolean) => void;
   onLayerSelect?: (layerId: string | null) => void;
   onAddLayer?: () => void;
-  onToolSelect?: (tool: string) => void;
   onSettingsOpen?: () => void;
   selectedLayerId?: string | null;
-  activeTool?: string;
 }
 
-const geomIcons: Record<string, any> = {
-  Point: Circle,
-  LineString: Route,
-  Polygon: Square,
-};
+function getLayerTypeBadge(layer: Layer): string {
+  const rm = layer.renderMode?.toLowerCase() ?? "";
+  if (rm === "heatmap") return "HEATMAP";
+  if (rm === "raster" || rm === "tile") return "RASTER";
+  if (rm === "dem") return "DEM";
+  return "VECTOR";
+}
+
+function getLayerSizeLabel(layer: Layer): string {
+  if (layer.renderMode === "tile" || layer.renderMode === "heatmap") return "Stream";
+  const count = layer.featureCount ?? 0;
+  if (count > 100000) return `${Math.round(count / 1000)}K`;
+  if (count > 1000) return `${(count / 1000).toFixed(1)}K`;
+  return `${count}`;
+}
 
 export function AppSidebar({
   onLayerToggle,
   onLayerSelect,
   onAddLayer,
-  onToolSelect,
   onSettingsOpen,
   selectedLayerId,
-  activeTool,
 }: AppSidebarProps) {
   const { toast } = useToast();
-  const [expandedLayers, setExpandedLayers] = useState<Set<string>>(new Set());
 
   const { data: layersData, isLoading } = useQuery<Layer[]>({
     queryKey: ["/api/layers"],
-  });
-
-  const { data: basemapList = [] } = useQuery<Basemap[]>({
-    queryKey: ["/api/basemaps"],
-  });
-
-  const { data: stats } = useQuery<{ layerCount: number; totalFeatures: number }>({
-    queryKey: ["/api/stats"],
-  });
-
-  const enabledBasemaps = basemapList.filter(b => b.enabled);
-
-  const toggleBasemapMutation = useMutation({
-    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      if (!enabled && enabledBasemaps.length <= 1) {
-        throw new Error("최소 하나의 배경 지도가 활성화되어 있어야 합니다.");
-      }
-      await apiRequest("PATCH", `/api/basemaps/${id}`, { enabled });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/basemaps"] });
-    },
-    onError: (error: Error) => {
-      toast({ title: "배경 지도 오류", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/layers/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/layers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      toast({ title: "Layer deleted" });
-    },
   });
 
   const updateMutation = useMutation({
@@ -103,40 +68,57 @@ export function AppSidebar({
     },
   });
 
-  const toggleExpand = (id: string) => {
-    setExpandedLayers(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const badgeColorMap: Record<string, string> = {
+    VECTOR: "bg-emerald-600/20 text-emerald-400 border-emerald-500/30",
+    RASTER: "bg-violet-600/20 text-violet-400 border-violet-500/30",
+    DEM: "bg-amber-600/20 text-amber-400 border-amber-500/30",
+    HEATMAP: "bg-rose-600/20 text-rose-400 border-rose-500/30",
   };
-
-  const tools = [
-    { id: "select", label: "Select", icon: Search },
-    { id: "radius", label: "Radius Search", icon: Activity },
-    { id: "measure", label: "Measure", icon: Route },
-  ];
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
+      <SidebarHeader className="p-4 pb-3">
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary text-primary-foreground">
             <Globe className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold">GIS Solution</h2>
-            <p className="text-xs text-muted-foreground">Spatial Data Platform</p>
+            <h2 className="text-sm font-semibold" data-testid="text-app-title">GIS 업무 솔루션</h2>
+            <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v1.0 - Enterprise Edition</p>
           </div>
         </div>
       </SidebarHeader>
 
+      <Separator />
+
       <SidebarContent className="overflow-y-auto scrollbar-none">
+        <div className="px-4 pt-3 pb-1">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground" data-testid="text-workspace-label">활성 작업 공간</span>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 justify-between text-xs font-normal"
+              data-testid="button-project-selector"
+            >
+              <span className="truncate">Project_Alpha_01</span>
+              <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="button-project-manage"
+            >
+              관리
+            </Button>
+          </div>
+        </div>
+
         <SidebarGroup>
           <div className="flex items-center justify-between gap-1 px-2">
             <SidebarGroupLabel className="px-0">
               <Layers className="w-3.5 h-3.5 mr-1.5" />
-              Layers
+              레이어
             </SidebarGroupLabel>
             <Button
               size="icon"
@@ -153,101 +135,61 @@ export function AppSidebar({
                 Array.from({ length: 3 }).map((_, i) => (
                   <SidebarMenuItem key={i}>
                     <div className="px-2 py-2">
-                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-10 w-full" />
                     </div>
                   </SidebarMenuItem>
                 ))
               ) : layersData && layersData.length > 0 ? (
                 layersData.map((layer) => {
-                  const GeomIcon = geomIcons[layer.geometryType] || Layers;
-                  const isExpanded = expandedLayers.has(layer.id);
+                  const typeBadge = getLayerTypeBadge(layer);
+                  const sizeLabel = getLayerSizeLabel(layer);
                   const isSelected = selectedLayerId === layer.id;
+                  const badgeClass = badgeColorMap[typeBadge] || badgeColorMap.VECTOR;
 
                   return (
                     <SidebarMenuItem key={layer.id}>
-                      <div className={`rounded-md transition-colors ${isSelected ? "bg-accent" : ""}`}>
-                        <div className="flex items-center gap-1 px-2 py-1.5">
-                          <button
-                            onClick={() => toggleExpand(layer.id)}
-                            className="p-0.5 rounded hover-elevate"
-                            data-testid={`button-expand-layer-${layer.id}`}
-                          >
-                            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                          </button>
-                          <button
-                            onClick={() => {
-                              const newVisible = !layer.visible;
-                              updateMutation.mutate({ id: layer.id, updates: { visible: newVisible } });
-                              onLayerToggle?.(layer.id, newVisible);
-                            }}
-                            className="p-0.5"
-                            data-testid={`button-toggle-visibility-${layer.id}`}
-                          >
-                            {layer.visible ? (
-                              <Eye className="w-3.5 h-3.5 text-primary" />
-                            ) : (
-                              <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
-                            )}
-                          </button>
-                          <div
-                            className="w-3 h-3 rounded-sm border flex-shrink-0"
-                            style={{ backgroundColor: layer.fillColor, borderColor: layer.strokeColor }}
-                          />
-                          <button
-                            className="flex-1 text-left text-xs font-medium truncate px-1"
-                            onClick={() => onLayerSelect?.(isSelected ? null : layer.id)}
-                            data-testid={`button-select-layer-${layer.id}`}
-                          >
-                            {layer.name}
-                          </button>
-                          <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
-                            {layer.featureCount.toLocaleString()}
-                          </Badge>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="px-3 pb-2 space-y-2">
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                              <GeomIcon className="w-3 h-3" />
-                              <span>{layer.geometryType}</span>
-                              <span>EPSG:{layer.srid}</span>
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-muted-foreground">Opacity</span>
-                                <span className="text-[10px] text-muted-foreground">{Math.round(layer.opacity * 100)}%</span>
-                              </div>
-                              <Slider
-                                value={[layer.opacity * 100]}
-                                min={0}
-                                max={100}
-                                step={5}
-                                onValueChange={([v]) => {
-                                  updateMutation.mutate({ id: layer.id, updates: { opacity: v / 100 } });
-                                }}
-                                data-testid={`slider-opacity-${layer.id}`}
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-1 text-[10px]">
-                              <div className="text-muted-foreground">Render</div>
-                              <div className="capitalize">{layer.renderMode}</div>
-                              <div className="text-muted-foreground">Detail Zoom</div>
-                              <div>Z{layer.minZoomForFeatures}+</div>
-                              <div className="text-muted-foreground">Limit</div>
-                              <div>{layer.featureLimit.toLocaleString()}</div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full h-7 text-[11px] text-destructive"
-                              onClick={() => deleteMutation.mutate(layer.id)}
-                              data-testid={`button-delete-layer-${layer.id}`}
+                      <div
+                        className={`flex items-start gap-2.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors ${isSelected ? "bg-accent" : "hover-elevate"}`}
+                        onClick={() => onLayerSelect?.(isSelected ? null : layer.id)}
+                        data-testid={`button-select-layer-${layer.id}`}
+                      >
+                        <Switch
+                          checked={layer.visible}
+                          onCheckedChange={(checked) => {
+                            updateMutation.mutate({ id: layer.id, updates: { visible: checked } });
+                            onLayerToggle?.(layer.id, checked);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5 data-[state=checked]:bg-primary"
+                          data-testid={`switch-toggle-visibility-${layer.id}`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <div
+                              className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                              style={{ backgroundColor: layer.fillColor, border: `1px solid ${layer.strokeColor}` }}
+                            />
+                            <span
+                              className={`text-xs font-medium truncate ${!layer.visible ? "text-muted-foreground" : ""}`}
+                              data-testid={`text-layer-name-${layer.id}`}
                             >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              Delete Layer
-                            </Button>
+                              {layer.name}
+                            </span>
                           </div>
-                        )}
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] px-1.5 py-0 h-4 font-semibold tracking-wider border ${badgeClass} no-default-hover-elevate no-default-active-elevate`}
+                              data-testid={`badge-layer-type-${layer.id}`}
+                            >
+                              {typeBadge}
+                            </Badge>
+                            <span className="text-[9px] text-muted-foreground">·</span>
+                            <span className="text-[9px] text-muted-foreground" data-testid={`text-layer-size-${layer.id}`}>
+                              {sizeLabel}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </SidebarMenuItem>
                   );
@@ -256,98 +198,36 @@ export function AppSidebar({
                 <SidebarMenuItem>
                   <div className="px-3 py-4 text-center">
                     <Map className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-                    <p className="text-xs text-muted-foreground">No layers yet</p>
-                    <p className="text-[10px] text-muted-foreground/60">Click + to add a layer</p>
+                    <p className="text-xs text-muted-foreground" data-testid="text-no-layers">레이어가 없습니다</p>
+                    <p className="text-[10px] text-muted-foreground/60">+ 버튼을 눌러 추가하세요</p>
                   </div>
                 </SidebarMenuItem>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        <Separator className="mx-2" />
-
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            <Globe className="w-3.5 h-3.5 mr-1.5" />
-            Background Maps
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {basemapList.map((bm) => (
-                <SidebarMenuItem key={bm.id}>
-                  <div className="flex items-center gap-2 px-2 py-1">
-                    <button
-                      onClick={() => toggleBasemapMutation.mutate({ id: bm.id, enabled: !bm.enabled })}
-                      className="p-0.5"
-                      data-testid={`button-toggle-basemap-${bm.id}`}
-                    >
-                      {bm.enabled ? (
-                        <Eye className="w-3.5 h-3.5 text-primary" />
-                      ) : (
-                        <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
-                      )}
-                    </button>
-                    <span
-                      className={`text-xs flex-1 truncate ${bm.enabled ? "" : "text-muted-foreground"}`}
-                      data-testid={`text-basemap-name-${bm.id}`}
-                    >
-                      {bm.name}
-                    </span>
-                    {bm.isDefault && (
-                      <Star className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                    )}
-                  </div>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <Separator className="mx-2" />
-
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            <Settings2 className="w-3.5 h-3.5 mr-1.5" />
-            Tools
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {tools.map((tool) => (
-                <SidebarMenuItem key={tool.id}>
-                  <SidebarMenuButton
-                    onClick={() => onToolSelect?.(tool.id)}
-                    data-active={activeTool === tool.id}
-                    className={activeTool === tool.id ? "bg-accent" : ""}
-                    data-testid={`button-tool-${tool.id}`}
-                  >
-                    <tool.icon className="w-4 h-4" />
-                    <span>{tool.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3 space-y-2">
+      <SidebarFooter className="p-3 space-y-1">
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start text-xs h-8"
+          className="w-full justify-start text-xs"
+          data-testid="button-export-data"
+        >
+          <Download className="w-3.5 h-3.5 mr-2" />
+          데이터 내보내기
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-xs"
           onClick={onSettingsOpen}
           data-testid="button-open-settings"
         >
           <Settings2 className="w-3.5 h-3.5 mr-2" />
-          설정
+          시스템 설정
         </Button>
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <Database className="w-3 h-3" />
-          <span>
-            {stats ? `${stats.layerCount} layers, ${stats.totalFeatures.toLocaleString()} features` : "Loading..."}
-          </span>
-        </div>
       </SidebarFooter>
     </Sidebar>
   );

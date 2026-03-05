@@ -17,8 +17,9 @@ import { defaults as defaultControls } from "ol/control";
 import type { Layer, Feature, Basemap } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatCoordinate } from "@/lib/mapUtils";
-import { Globe, ChevronDown, AlertTriangle } from "lucide-react";
+import { Search, MapPin, Plus, Minus, AlertTriangle } from "lucide-react";
 
 interface MapViewerProps {
   layers: Layer[];
@@ -39,6 +40,15 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
 
   if (basemap.provider === "osm" && !basemap.urlTemplate) {
     return { source: new OSM(), error: null };
+  }
+
+  if (basemap.provider === "esri") {
+    const xyzSource = new XYZ({
+      url: basemap.urlTemplate,
+      maxZoom: basemap.maxZoom,
+      attributions: basemap.attribution || undefined,
+    });
+    return { source: xyzSource, error: null };
   }
 
   let url = basemap.urlTemplate;
@@ -93,8 +103,8 @@ function getClusterStyle(count: number) {
   return new Style({
     image: new CircleStyle({
       radius: size,
-      fill: new Fill({ color: "rgba(59, 130, 246, 0.7)" }),
-      stroke: new Stroke({ color: "#2563eb", width: 2 }),
+      fill: new Fill({ color: "rgba(0, 200, 220, 0.6)" }),
+      stroke: new Stroke({ color: "#00d4e0", width: 2 }),
     }),
     text: new TextStyle({
       text: count > 999 ? `${(count / 1000).toFixed(1)}k` : count.toString(),
@@ -126,9 +136,8 @@ export function MapViewer({
   const [currentZoom, setCurrentZoom] = useState(11);
   const [cursorCoord, setCursorCoord] = useState<[number, number] | null>(null);
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
-  const [basemapSelectorOpen, setBasemapSelectorOpen] = useState(false);
-  const [activeBasemapId, setActiveBasemapId] = useState<string | null>(null);
   const [basemapError, setBasemapError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const tileErrorCountRef = useRef(0);
 
   const { data: basemapList = [] } = useQuery<Basemap[]>({
@@ -136,8 +145,7 @@ export function MapViewer({
   });
 
   const enabledBasemaps = basemapList.filter(b => b.enabled);
-  const activeBasemap = enabledBasemaps.find(b => b.id === activeBasemapId)
-    || enabledBasemaps.find(b => b.isDefault)
+  const activeBasemap = enabledBasemaps.find(b => b.isDefault)
     || enabledBasemaps[0];
 
   useEffect(() => {
@@ -158,7 +166,7 @@ export function MapViewer({
         maxZoom: 20,
         minZoom: 2,
       }),
-      controls: defaultControls({ zoom: true, rotate: false, attribution: false }),
+      controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
     });
 
     const highlightSource = new VectorSource();
@@ -439,12 +447,54 @@ export function MapViewer({
     }
   }, [searchResults]);
 
+  const handleZoomIn = useCallback(() => {
+    if (!mapInstance.current) return;
+    const view = mapInstance.current.getView();
+    const zoom = view.getZoom();
+    if (zoom !== undefined) {
+      view.animate({ zoom: Math.min(zoom + 1, 20), duration: 200 });
+    }
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    if (!mapInstance.current) return;
+    const view = mapInstance.current.getView();
+    const zoom = view.getZoom();
+    if (zoom !== undefined) {
+      view.animate({ zoom: Math.max(zoom - 1, 2), duration: 200 });
+    }
+  }, []);
+
+  const handleSearchGo = useCallback(() => {
+    if (!mapInstance.current || !searchQuery.trim()) return;
+    const q = searchQuery.trim();
+    const coordMatch = q.match(/^(-?\d+\.?\d*)\s*[,\s]\s*(-?\d+\.?\d*)$/);
+    if (coordMatch) {
+      const a = parseFloat(coordMatch[1]);
+      const b = parseFloat(coordMatch[2]);
+      let lng: number, lat: number;
+      if (Math.abs(a) <= 90 && Math.abs(b) > 90) {
+        lat = a; lng = b;
+      } else if (Math.abs(b) <= 90 && Math.abs(a) > 90) {
+        lng = a; lat = b;
+      } else {
+        lat = a; lng = b;
+      }
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        const view = mapInstance.current.getView();
+        view.animate({ center: fromLonLat([lng, lat]), zoom: 15, duration: 500 });
+        setSearchQuery("");
+        return;
+      }
+    }
+  }, [searchQuery]);
+
   return (
     <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full" data-testid="map-container" />
 
       {basemapError && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 max-w-md" data-testid="basemap-error">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 max-w-md" data-testid="basemap-error">
           <div className="bg-destructive/90 text-destructive-foreground backdrop-blur-sm rounded-md px-4 py-2.5 shadow-lg flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <div>
@@ -455,59 +505,59 @@ export function MapViewer({
         </div>
       )}
 
-      <div className="absolute top-3 right-3 flex flex-col gap-2 z-10">
-        <div className="bg-card/90 backdrop-blur-sm border border-card-border rounded-md px-3 py-1.5 flex items-center gap-2">
-          <Badge variant="secondary" className="text-[10px]">Z{currentZoom}</Badge>
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleSearchGo(); }} className="flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-md border border-white/10 px-2">
+          <Search className="w-4 h-4 text-white/60 flex-shrink-0" />
+          <Input
+            type="text"
+            placeholder="좌표 검색 (예: 37.5665, 126.978)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="border-0 bg-transparent text-white placeholder:text-white/40 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+            data-testid="input-map-search"
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            type="submit"
+            className="text-white/60 hover:text-white flex-shrink-0"
+            data-testid="button-map-pin"
+          >
+            <MapPin className="w-4 h-4" />
+          </Button>
+        </form>
+      </div>
+
+      <div className="absolute top-3 right-3 z-10">
+        <div className="bg-black/50 backdrop-blur-sm rounded-md px-2.5 py-1 flex items-center gap-2">
+          <span className="text-[10px] font-mono text-white/70">Z{currentZoom}</span>
           {cursorCoord && (
-            <span className="text-[10px] font-mono text-muted-foreground">
+            <span className="text-[10px] font-mono text-white/50">
               {formatCoordinate(cursorCoord[1], "lat")}, {formatCoordinate(cursorCoord[0], "lng")}
             </span>
           )}
         </div>
       </div>
 
-      <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-2">
-        {enabledBasemaps.length > 1 && (
-          <div className="relative">
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-8 text-[11px] bg-card/90 backdrop-blur-sm border border-card-border shadow-sm"
-              onClick={() => setBasemapSelectorOpen(!basemapSelectorOpen)}
-              data-testid="button-basemap-selector"
-            >
-              <Globe className="w-3.5 h-3.5 mr-1.5" />
-              {activeBasemap?.name || "배경 지도"}
-              <ChevronDown className="w-3 h-3 ml-1" />
-            </Button>
-            {basemapSelectorOpen && (
-              <div className="absolute bottom-full left-0 mb-1 bg-card border border-card-border rounded-md shadow-lg min-w-[180px] py-1">
-                {enabledBasemaps.map((bm) => (
-                  <button
-                    key={bm.id}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-2 ${
-                      activeBasemap?.id === bm.id ? "bg-accent font-medium" : ""
-                    }`}
-                    onClick={() => {
-                      setActiveBasemapId(bm.id);
-                      setBasemapSelectorOpen(false);
-                    }}
-                    data-testid={`button-select-basemap-${bm.id}`}
-                  >
-                    <Globe className="w-3 h-3 text-muted-foreground" />
-                    {bm.name}
-                    {bm.isDefault && (
-                      <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 ml-auto">기본</Badge>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        <div className="bg-card/90 backdrop-blur-sm border border-card-border rounded-md px-3 py-1.5">
-          <span className="text-[10px] text-muted-foreground">EPSG:3857 (Display) / EPSG:4326 (Data)</span>
-        </div>
+      <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-1">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={handleZoomIn}
+          className="bg-black/60 backdrop-blur-sm text-white/80 hover:text-white border border-white/10"
+          data-testid="button-zoom-in"
+        >
+          <Plus className="w-4 h-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={handleZoomOut}
+          className="bg-black/60 backdrop-blur-sm text-white/80 hover:text-white border border-white/10"
+          data-testid="button-zoom-out"
+        >
+          <Minus className="w-4 h-4" />
+        </Button>
       </div>
 
       <div ref={popupRef} className="absolute" style={{ display: popupContent ? "block" : "none" }}>

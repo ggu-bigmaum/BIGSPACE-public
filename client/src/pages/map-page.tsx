@@ -8,15 +8,12 @@ import { useToast } from "@/hooks/use-toast";
 
 interface MapPageProps {
   selectedLayerId?: string | null;
-  activeTool?: string;
-  onLayerSelect?: (id: string | null) => void;
-  onToolSelect?: (tool: string) => void;
 }
 
 export default function MapPage({
   selectedLayerId = null,
-  activeTool = "select",
 }: MapPageProps) {
+  const activeTool = "select";
   const { toast } = useToast();
   const [currentBbox, setCurrentBbox] = useState<number[]>([]);
   const [currentZoom, setCurrentZoom] = useState(11);
