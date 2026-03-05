@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Layers, Plus, Map, Download, Settings2, Globe, ChevronDown,
+  Layers, Plus, Map, Download, Settings2, Globe,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -92,28 +92,6 @@ export function AppSidebar({
       <Separator />
 
       <SidebarContent className="overflow-y-auto scrollbar-none">
-        <div className="px-4 pt-3 pb-1">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground" data-testid="text-workspace-label">활성 작업 공간</span>
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 justify-between text-xs font-normal"
-              data-testid="button-project-selector"
-            >
-              <span className="truncate">Project_Alpha_01</span>
-              <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="button-project-manage"
-            >
-              관리
-            </Button>
-          </div>
-        </div>
-
         <SidebarGroup>
           <div className="flex items-center justify-between gap-1 px-2">
             <SidebarGroupLabel className="px-0">
