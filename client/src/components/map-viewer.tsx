@@ -19,7 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCoordinate } from "@/lib/mapUtils";
-import { Search, MapPin, Plus, Minus, AlertTriangle } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Search, MapPin, Plus, Minus, AlertTriangle, Layers } from "lucide-react";
 
 interface MapViewerProps {
   layers: Layer[];
@@ -138,10 +140,20 @@ export function MapViewer({
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
   const [basemapError, setBasemapError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [basemapPickerOpen, setBasemapPickerOpen] = useState(false);
   const tileErrorCountRef = useRef(0);
 
   const { data: basemapList = [] } = useQuery<Basemap[]>({
     queryKey: ["/api/basemaps"],
+  });
+
+  const setDefaultMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("POST", `/api/basemaps/${id}/default`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/basemaps"] });
+    },
   });
 
   const enabledBasemaps = basemapList.filter(b => b.enabled);
@@ -558,6 +570,42 @@ export function MapViewer({
         >
           <Minus className="w-4 h-4" />
         </Button>
+      </div>
+
+      <div className="absolute bottom-3 left-3 z-10">
+        <div className="relative">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setBasemapPickerOpen(!basemapPickerOpen)}
+            className="bg-black/60 backdrop-blur-sm text-white/80 hover:text-white border border-white/10 text-xs gap-1.5"
+            data-testid="button-basemap-picker"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            {activeBasemap?.name || "배경지도"}
+          </Button>
+          {basemapPickerOpen && enabledBasemaps.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-1 bg-black/80 backdrop-blur-md rounded-md border border-white/10 py-1 min-w-[160px]">
+              {enabledBasemaps.map((bm) => (
+                <button
+                  key={bm.id}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                    bm.id === activeBasemap?.id
+                      ? "text-cyan-400 bg-white/10"
+                      : "text-white/70 hover:text-white hover:bg-white/5"
+                  }`}
+                  onClick={() => {
+                    setDefaultMutation.mutate(bm.id);
+                    setBasemapPickerOpen(false);
+                  }}
+                  data-testid={`button-select-basemap-${bm.id}`}
+                >
+                  {bm.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div ref={popupRef} className="absolute" style={{ display: popupContent ? "block" : "none" }}>
