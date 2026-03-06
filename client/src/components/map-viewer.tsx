@@ -101,7 +101,9 @@ function getHighlightStyle() {
 }
 
 function getClusterStyle(count: number) {
-  const size = Math.min(50, 10 + count * 3);
+  const size = count <= 20
+    ? 10 + Math.sqrt(count) * 7
+    : 10 + Math.sqrt(20) * 7 + Math.log2(count / 20) * 6;
   return new Style({
     image: new CircleStyle({
       radius: size,
