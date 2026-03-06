@@ -101,7 +101,7 @@ function getHighlightStyle() {
 }
 
 function getClusterStyle(count: number) {
-  const size = Math.min(40, Math.max(16, Math.log2(count) * 6));
+  const size = Math.min(48, 12 + Math.sqrt(count) * 5);
   return new Style({
     image: new CircleStyle({
       radius: size,
@@ -111,7 +111,7 @@ function getClusterStyle(count: number) {
     text: new TextStyle({
       text: count > 999 ? `${(count / 1000).toFixed(1)}k` : count.toString(),
       fill: new Fill({ color: "#ffffff" }),
-      font: `bold ${Math.max(11, size * 0.5)}px sans-serif`,
+      font: `bold ${Math.max(11, size * 0.45)}px sans-serif`,
     }),
   });
 }
