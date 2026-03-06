@@ -8,9 +8,11 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AddLayerDialog } from "@/components/add-layer-dialog";
 import { SettingsDialog } from "@/components/settings-dialog";
 import MapPage from "@/pages/map-page";
+import ProductInfoPage from "@/pages/product-info";
 import { useState } from "react";
+import { Route, Switch } from "wouter";
 
-function AppLayout() {
+function MapLayout() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [addLayerDialogOpen, setAddLayerDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -47,7 +49,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <AppLayout />
+          <Switch>
+            <Route path="/product-info" component={ProductInfoPage} />
+            <Route path="/" component={MapLayout} />
+          </Switch>
           <Toaster />
         </ThemeProvider>
       </TooltipProvider>

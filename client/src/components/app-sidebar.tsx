@@ -18,8 +18,9 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Layers, Plus, Map, Download, Settings2, Globe,
+  Layers, Plus, Map, Download, Settings2, Globe, Info,
 } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 interface AppSidebarProps {
@@ -187,6 +188,17 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter className="p-3 space-y-1">
+        <Link href="/product-info">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-xs"
+            data-testid="button-product-info"
+          >
+            <Info className="w-3.5 h-3.5 mr-2" />
+            제품 소개
+          </Button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"

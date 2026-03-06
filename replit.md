@@ -30,6 +30,7 @@
 - `spatial_queries` - 저장된 공간 쿼리 이력
 
 ## 주요 파일
+- `client/src/pages/product-info.tsx` - 제품 소개 페이지 (기능 설명, 기술 스택)
 - `shared/schema.ts` - Drizzle 스키마 정의
 - `server/routes.ts` - API 엔드포인트 (레이어 CRUD, 피처, 집계, 공간 쿼리, 배경지도, 설정)
 - `server/storage.ts` - DatabaseStorage (공간 연산 포함)
