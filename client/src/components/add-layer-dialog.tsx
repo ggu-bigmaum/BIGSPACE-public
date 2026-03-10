@@ -40,6 +40,8 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("일반");
+  const [isNewCategory, setIsNewCategory] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState("");
   const [geometryType, setGeometryType] = useState("Point");
   const [renderMode, setRenderMode] = useState("auto");
   const [featureLimit, setFeatureLimit] = useState("2000");
@@ -53,11 +55,18 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
     queryKey: ["/api/layers"],
   });
 
+  const existingCategories = [...new Set(layers.map((l) => l.category || "일반"))].sort();
+
   useEffect(() => {
     if (open) {
       const existing = layers.map((l) => l.strokeColor);
       const next = getNextColor(existing);
       setStrokeColor(next.strokeColor);
+      setIsNewCategory(false);
+      setNewCategoryInput("");
+      if (existingCategories.length > 0) {
+        setCategory(existingCategories[0]);
+      }
       setFillColor(next.fillColor);
     }
   }, [open, layers]);
@@ -99,6 +108,8 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
     setName("");
     setDescription("");
     setCategory("일반");
+    setIsNewCategory(false);
+    setNewCategoryInput("");
     setGeometryType("Point");
     setRenderMode("auto");
     setFeatureLimit("2000");
@@ -117,7 +128,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
     createLayerMutation.mutate({
       name: name.trim(),
       description: description.trim() || undefined,
-      category: category.trim() || "일반",
+      category: (isNewCategory ? newCategoryInput.trim() : category.trim()) || "일반",
       geometryType,
       renderMode,
       featureLimit: parseInt(featureLimit),
@@ -162,14 +173,60 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
               />
             </div>
             <div className="col-span-2">
-              <Label htmlFor="layer-category">카테고리</Label>
-              <Input
-                id="layer-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="예: 인프라, 교통, 행정, 환경"
-                data-testid="input-layer-category"
-              />
+              <Label>카테고리</Label>
+              {existingCategories.length > 0 && !isNewCategory ? (
+                <div className="flex items-center gap-2">
+                  <Select value={category} onValueChange={(val) => {
+                    if (val === "__new__") {
+                      setIsNewCategory(true);
+                      setNewCategoryInput("");
+                    } else {
+                      setCategory(val);
+                    }
+                  }}>
+                    <SelectTrigger className="flex-1" data-testid="select-layer-category">
+                      <SelectValue placeholder="카테고리 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {existingCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                      <SelectItem value="__new__">+ 새 카테고리</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={isNewCategory ? newCategoryInput : category}
+                    onChange={(e) => {
+                      if (isNewCategory) {
+                        setNewCategoryInput(e.target.value);
+                      } else {
+                        setCategory(e.target.value);
+                      }
+                    }}
+                    placeholder="새 카테고리 이름 입력"
+                    data-testid="input-new-category"
+                    className="flex-1"
+                  />
+                  {existingCategories.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-8 px-2 shrink-0"
+                      onClick={() => {
+                        setIsNewCategory(false);
+                        setCategory(existingCategories[0]);
+                      }}
+                      data-testid="button-cancel-new-category"
+                    >
+                      기존 선택
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
