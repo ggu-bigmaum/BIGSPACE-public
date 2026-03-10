@@ -29,7 +29,6 @@ function MapLayout() {
         <AppSidebar
           onLayerToggle={() => {}}
           onLayerSelect={setSelectedLayerId}
-          onAddLayer={() => setAddLayerDialogOpen(true)}
           onSettingsOpen={() => setSettingsOpen(true)}
           onAnalysisOpen={() => setAnalysisOpen(true)}
           selectedLayerId={selectedLayerId}
@@ -43,7 +42,7 @@ function MapLayout() {
         </main>
       </div>
       <AddLayerDialog open={addLayerDialogOpen} onOpenChange={setAddLayerDialogOpen} />
-      <SettingsPopup open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsPopup open={settingsOpen} onClose={() => setSettingsOpen(false)} onAddLayer={() => { setSettingsOpen(false); setAddLayerDialogOpen(true); }} />
     </SidebarProvider>
   );
 }

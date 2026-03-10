@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu,
+  Layers, Map, Download, Settings2, Globe, Info, Cpu,
   Siren, Landmark, Car, Building2, TreePine, Users, Package, Zap, Hash,
 } from "lucide-react";
 import {
@@ -33,7 +33,6 @@ import { useToast } from "@/hooks/use-toast";
 interface AppSidebarProps {
   onLayerToggle?: (layerId: string, visible: boolean) => void;
   onLayerSelect?: (layerId: string | null) => void;
-  onAddLayer?: () => void;
   onSettingsOpen?: () => void;
   onAnalysisOpen?: () => void;
   selectedLayerId?: string | null;
@@ -83,7 +82,6 @@ const BADGE_TOOLTIP: Record<string, string> = {
 export function AppSidebar({
   onLayerToggle,
   onLayerSelect,
-  onAddLayer,
   onSettingsOpen,
   onAnalysisOpen,
   selectedLayerId,
@@ -170,14 +168,6 @@ export function AppSidebar({
               <Layers className="w-3.5 h-3.5 mr-1.5" />
               레이어
             </SidebarGroupLabel>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={onAddLayer}
-              data-testid="button-add-layer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </Button>
           </div>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -307,7 +297,7 @@ export function AppSidebar({
                   <div className="px-3 py-4 text-center">
                     <Map className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
                     <p className="text-xs text-muted-foreground" data-testid="text-no-layers">레이어가 없습니다</p>
-                    <p className="text-[10px] text-muted-foreground/60">+ 버튼을 눌러 추가하세요</p>
+                    <p className="text-[10px] text-muted-foreground/60">설정 &gt; 레이어 관리에서 추가하세요</p>
                   </div>
                 </SidebarMenuItem>
               )}

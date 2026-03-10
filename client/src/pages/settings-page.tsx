@@ -29,6 +29,7 @@ type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" |
 interface SettingsPopupProps {
   open: boolean;
   onClose: () => void;
+  onAddLayer?: () => void;
 }
 
 const NAV_ITEMS: { id: SettingsSection; label: string; icon: typeof Settings2 }[] = [
@@ -267,7 +268,7 @@ function SettingRow({ setting, onUpdate }: {
   );
 }
 
-export default function SettingsPopup({ open, onClose }: SettingsPopupProps) {
+export default function SettingsPopup({ open, onClose, onAddLayer }: SettingsPopupProps) {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
@@ -392,6 +393,7 @@ export default function SettingsPopup({ open, onClose }: SettingsPopupProps) {
             layers={layerList}
             onUpdate={(id, updates) => updateLayerMutation.mutate({ id, updates })}
             onDelete={(id) => deleteLayerMutation.mutate(id)}
+            onAddLayer={onAddLayer}
           />
         );
       case "basemaps":
@@ -1131,10 +1133,11 @@ function LayerCard({ layer, onUpdate, onDelete }: {
   );
 }
 
-function LayersSection({ layers, onUpdate, onDelete }: {
+function LayersSection({ layers, onUpdate, onDelete, onAddLayer }: {
   layers: Layer[];
   onUpdate: (id: string, updates: Partial<Layer>) => void;
   onDelete: (id: string) => void;
+  onAddLayer?: () => void;
 }) {
   const grouped = layers.reduce<Record<string, Layer[]>>((acc, layer) => {
     const cat = layer.category || "일반";
@@ -1172,11 +1175,19 @@ function LayersSection({ layers, onUpdate, onDelete }: {
             총 {layers.length}개 레이어, {categories.length}개 카테고리
           </p>
         </div>
-        {categories.length > 1 && (
-          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={toggleAll} data-testid="button-toggle-all-categories">
-            {allExpanded ? "모두 접기" : "모두 펼치기"}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {categories.length > 1 && (
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={toggleAll} data-testid="button-toggle-all-categories">
+              {allExpanded ? "모두 접기" : "모두 펼치기"}
+            </Button>
+          )}
+          {onAddLayer && (
+            <Button variant="outline" size="sm" className="text-xs h-7" onClick={onAddLayer} data-testid="button-add-layer">
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              레이어 추가
+            </Button>
+          )}
+        </div>
       </div>
 
       <Separator />
@@ -1185,7 +1196,7 @@ function LayersSection({ layers, onUpdate, onDelete }: {
         <div className="text-center py-12 text-muted-foreground">
           <Layers className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="text-sm">등록된 레이어가 없습니다.</p>
-          <p className="text-xs mt-1">사이드바에서 새 레이어를 추가할 수 있습니다.</p>
+          <p className="text-xs mt-1">위 "레이어 추가" 버튼으로 새 레이어를 추가할 수 있습니다.</p>
         </div>
       ) : (
         <div className="space-y-3">
