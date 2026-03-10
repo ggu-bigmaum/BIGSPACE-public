@@ -112,14 +112,26 @@ export function AppSidebar({
   return (
     <Sidebar>
       <SidebarHeader className="p-4 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary text-primary-foreground">
-            <Globe className="w-4 h-4" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary text-primary-foreground">
+              <Globe className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold" data-testid="text-app-title">GIS 업무 솔루션</h2>
+              <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v1.0 - Enterprise Edition</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm font-semibold" data-testid="text-app-title">GIS 업무 솔루션</h2>
-            <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v1.0 - Enterprise Edition</p>
-          </div>
+          <Link href="/product-info">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              data-testid="button-product-info"
+            >
+              <Info className="w-4 h-4" />
+            </Button>
+          </Link>
         </div>
       </SidebarHeader>
 
@@ -271,17 +283,6 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter className="p-3 space-y-1">
-        <Link href="/product-info">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-xs"
-            data-testid="button-product-info"
-          >
-            <Info className="w-3.5 h-3.5 mr-2" />
-            제품 소개
-          </Button>
-        </Link>
         <Button
           variant="ghost"
           size="sm"
