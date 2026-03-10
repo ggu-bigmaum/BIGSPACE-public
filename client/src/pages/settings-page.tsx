@@ -471,6 +471,22 @@ export default function SettingsPopup({ open, onClose }: SettingsPopupProps) {
 }
 
 function GeneralSection({ theme, setTheme }: { theme: string; setTheme: (t: "light" | "dark") => void }) {
+  const [badgeStyle, setBadgeStyle] = useState(() => localStorage.getItem("layerBadgeStyle") || "dot");
+
+  const handleBadgeStyleChange = (style: string) => {
+    setBadgeStyle(style);
+    localStorage.setItem("layerBadgeStyle", style);
+    window.dispatchEvent(new CustomEvent("badgeStyleChange", { detail: style }));
+  };
+
+  const badgeStyles = [
+    { id: "pill", label: "Pill 채움", description: "불투명 배경에 흰색 글자" },
+    { id: "icon", label: "아이콘+텍스트", description: "아이콘과 축약 텍스트 조합" },
+    { id: "dot", label: "도트+라벨", description: "색상 점과 한글 라벨" },
+    { id: "underline", label: "밑줄 강조", description: "하단 컬러 바와 텍스트" },
+    { id: "gradient", label: "그라데이션", description: "그라데이션 배경 칩" },
+  ];
+
   return (
     <div className="space-y-6" data-testid="section-general">
       <div>
@@ -548,6 +564,85 @@ function GeneralSection({ theme, setTheme }: { theme: string; setTheme: (t: "lig
                 <Badge className="mt-2 text-[9px]">현재 적용 중</Badge>
               )}
             </button>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div>
+          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+            <Layers className="w-4 h-4" />
+            지도 종류 표시 아이콘
+          </h3>
+          <p className="text-[11px] text-muted-foreground mb-4">사이드바 레이어 목록에 표시되는 종류 배지 스타일을 선택합니다.</p>
+
+          <div className="space-y-2">
+            {badgeStyles.map((style) => (
+              <button
+                key={style.id}
+                className={`w-full flex items-center gap-3 border rounded-lg px-4 py-3 text-left transition-all ${
+                  badgeStyle === style.id
+                    ? "border-primary ring-2 ring-primary/20"
+                    : "border-border hover:border-muted-foreground/30"
+                }`}
+                onClick={() => handleBadgeStyleChange(style.id)}
+                data-testid={`button-badge-style-${style.id}`}
+              >
+                <div className="flex items-center gap-2 w-32 flex-shrink-0">
+                  {style.id === "pill" && (
+                    <>
+                      <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-sm">V</span>
+                      <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-violet-500 text-white text-[10px] font-bold shadow-sm">R</span>
+                    </>
+                  )}
+                  {style.id === "icon" && (
+                    <>
+                      <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-md bg-emerald-500/15 text-emerald-500 text-[10px] font-semibold border border-emerald-500/25">
+                        <Layers className="w-3 h-3" />V
+                      </span>
+                      <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-md bg-violet-500/15 text-violet-500 text-[10px] font-semibold border border-violet-500/25">
+                        <Layers className="w-3 h-3" />R
+                      </span>
+                    </>
+                  )}
+                  {style.id === "dot" && (
+                    <>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />벡터
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-violet-400 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-violet-400" />래스터
+                      </span>
+                    </>
+                  )}
+                  {style.id === "underline" && (
+                    <>
+                      <span className="inline-flex flex-col items-center">
+                        <span className="text-[10px] font-semibold text-emerald-400">V</span>
+                        <span className="w-4 h-[2px] rounded-full bg-emerald-400 mt-0.5" />
+                      </span>
+                      <span className="inline-flex flex-col items-center">
+                        <span className="text-[10px] font-semibold text-violet-400">R</span>
+                        <span className="w-4 h-[2px] rounded-full bg-violet-400 mt-0.5" />
+                      </span>
+                    </>
+                  )}
+                  {style.id === "gradient" && (
+                    <>
+                      <span className="inline-flex items-center justify-center h-5 px-2 rounded-md text-[10px] font-bold text-white shadow-sm bg-gradient-to-r from-emerald-500 to-teal-400">V</span>
+                      <span className="inline-flex items-center justify-center h-5 px-2 rounded-md text-[10px] font-bold text-white shadow-sm bg-gradient-to-r from-violet-500 to-purple-400">R</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{style.label}</div>
+                  <div className="text-[10px] text-muted-foreground">{style.description}</div>
+                </div>
+                {badgeStyle === style.id && (
+                  <Badge className="text-[9px] flex-shrink-0">적용 중</Badge>
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
