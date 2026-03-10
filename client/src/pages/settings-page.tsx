@@ -20,13 +20,14 @@ import {
   Layers, Gauge, Plus, Cpu, Server, Cloud, Package,
   CheckCircle2, Settings2, Sun, Moon, Palette, X,
   ChevronDown, ChevronRight, Tag, Building2, Share2, BarChart3,
+  Database, Monitor, ArrowRight, ArrowDown, Shield, Workflow,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
 import { LAYER_PALETTE } from "@/lib/colorPalette";
 import { Check } from "lucide-react";
 
-type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" | "ml-server" | "products";
+type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" | "ml-server" | "products" | "architecture";
 
 interface SettingsPopupProps {
   open: boolean;
@@ -42,6 +43,7 @@ const NAV_ITEMS: { id: SettingsSection; label: string; icon: typeof Settings2 }[
   { id: "map", label: "지도 기본 설정", icon: Map },
   { id: "ml-server", label: "ML 연산 서버 설정", icon: Cpu },
   { id: "products", label: "제품 라인업", icon: Package },
+  { id: "architecture", label: "시스템 아키텍처", icon: Server },
 ];
 
 function BasemapCard({ basemap, onUpdate, onDelete, onSetDefault }: {
@@ -431,6 +433,8 @@ export default function SettingsPopup({ open, onClose, onAddLayer }: SettingsPop
         return <MLServerSection />;
       case "products":
         return <ProductsSection />;
+      case "architecture":
+        return <ArchitectureSection />;
       default:
         return null;
     }
@@ -1572,6 +1576,159 @@ function ProductsSection() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ArchitectureSection() {
+  const layers = [
+    {
+      title: "프레젠테이션 계층",
+      icon: Monitor,
+      color: "border-sky-500/40 bg-sky-500/5",
+      iconColor: "text-sky-500",
+      items: [
+        { name: "React 18", desc: "SPA 프론트엔드 프레임워크" },
+        { name: "OpenLayers", desc: "지도 렌더링 엔진 (벡터/래스터/타일)" },
+        { name: "Shadcn UI + Tailwind", desc: "컴포넌트 라이브러리 및 스타일링" },
+        { name: "TanStack Query", desc: "서버 상태 관리 및 데이터 캐싱" },
+      ],
+    },
+    {
+      title: "비즈니스 로직 계층",
+      icon: Workflow,
+      color: "border-primary/40 bg-primary/5",
+      iconColor: "text-primary",
+      items: [
+        { name: "Express.js", desc: "REST API 서버" },
+        { name: "공간 연산 엔진", desc: "버퍼/근접/밀도 분석 (애플리케이션 레벨)" },
+        { name: "Zod 검증", desc: "요청 데이터 스키마 유효성 검증" },
+        { name: "레이어 관리", desc: "벡터/래스터/DEM/히트맵 레이어 CRUD" },
+      ],
+    },
+    {
+      title: "데이터 계층",
+      icon: Database,
+      color: "border-emerald-500/40 bg-emerald-500/5",
+      iconColor: "text-emerald-500",
+      items: [
+        { name: "PostgreSQL", desc: "관계형 데이터베이스 (PostGIS 미사용)" },
+        { name: "Drizzle ORM", desc: "타입 안전 쿼리 빌더" },
+        { name: "lat/lng 인덱싱", desc: "공간 쿼리 최적화 (BBOX 필터링)" },
+        { name: "GeoJSON 저장", desc: "피처 지오메트리 JSONB 컬럼" },
+      ],
+    },
+    {
+      title: "보안 및 인프라",
+      icon: Shield,
+      color: "border-amber-500/40 bg-amber-500/5",
+      iconColor: "text-amber-500",
+      items: [
+        { name: "세션 기반 인증", desc: "EXPRESS 세션 + 비밀키 관리" },
+        { name: "내부망 배포", desc: "공공기관 보안 요건 대응" },
+        { name: "HTTPS/TLS", desc: "전송 구간 암호화" },
+        { name: "RBAC (예정)", desc: "역할 기반 접근 제어" },
+      ],
+    },
+  ];
+
+  const dataFlow = [
+    { from: "클라이언트 (브라우저)", to: "Express API 서버", protocol: "REST / JSON" },
+    { from: "Express API 서버", to: "PostgreSQL", protocol: "Drizzle ORM" },
+    { from: "Express API 서버", to: "배경 지도 서버", protocol: "XYZ 타일 프록시" },
+    { from: "Express API 서버", to: "ML 연산 서버 (선택)", protocol: "REST API" },
+  ];
+
+  return (
+    <div className="space-y-6" data-testid="section-architecture">
+      <div>
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <Server className="w-4 h-4 text-primary" />
+          시스템 아키텍처
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          BIGSPACE Public 솔루션의 기술 스택과 시스템 구성입니다.
+        </p>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        {layers.map((layer, idx) => {
+          const Icon = layer.icon;
+          return (
+            <div key={layer.title}>
+              <div className={`rounded-lg border p-4 ${layer.color}`} data-testid={`arch-layer-${idx}`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon className={`w-4 h-4 ${layer.iconColor}`} />
+                  <h3 className="text-sm font-semibold">{layer.title}</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {layer.items.map((item) => (
+                    <div key={item.name} className="flex items-start gap-2 rounded-md bg-background/60 border border-border/50 px-3 py-2">
+                      <CheckCircle2 className={`w-3 h-3 mt-0.5 flex-shrink-0 ${layer.iconColor}`} />
+                      <div>
+                        <span className="text-xs font-medium">{item.name}</span>
+                        <p className="text-[10px] text-muted-foreground leading-tight">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {idx < layers.length - 1 && (
+                <div className="flex justify-center py-1">
+                  <ArrowDown className="w-4 h-4 text-muted-foreground/40" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+          <ArrowRight className="w-3 h-3 text-primary" />
+          데이터 흐름
+        </h3>
+        <div className="space-y-2">
+          {dataFlow.map((flow, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-md border px-4 py-2.5" data-testid={`data-flow-${i}`}>
+              <span className="text-xs font-medium min-w-[140px]">{flow.from}</span>
+              <div className="flex items-center gap-1.5 flex-1">
+                <div className="h-px flex-1 bg-border" />
+                <Badge variant="outline" className="text-[9px] px-1.5 shrink-0">{flow.protocol}</Badge>
+                <div className="h-px flex-1 bg-border" />
+                <ArrowRight className="w-3 h-3 text-primary flex-shrink-0" />
+              </div>
+              <span className="text-xs font-medium min-w-[140px] text-right">{flow.to}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="rounded-lg border border-dashed border-muted-foreground/30 p-5 space-y-3">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <Info className="w-3 h-3 text-primary" />
+          설계 원칙
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { title: "PostGIS 미사용", desc: "애플리케이션 레벨 공간 연산으로 설치 종속성 최소화. lat/lng 인덱스 기반 BBOX 필터링으로 성능 확보." },
+            { title: "단일 서버 배포", desc: "프론트엔드와 백엔드를 하나의 Express 서버에서 서빙. 공공기관 내부망 배포 용이성 확보." },
+            { title: "줌 기반 렌더링 전략", desc: "저줌에서 집계 클러스터, 중간 줌에서 단순화, 고줌에서 개별 피처를 표시하는 3단계 렌더링." },
+            { title: "확장 가능 구조", desc: "ML 서버 연동, 데이터 공유 API, RBAC 등 모듈형 확장이 가능한 아키텍처 설계." },
+          ].map((principle) => (
+            <div key={principle.title} className="space-y-1">
+              <span className="text-xs font-semibold">{principle.title}</span>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">{principle.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
