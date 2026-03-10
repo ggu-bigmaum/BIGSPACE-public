@@ -190,22 +190,14 @@ export function AppSidebar({
                         <Separator className="my-1" />
                         <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1" data-testid={`category-label-${cat}`}>
                           {(() => {
-                            const iconMap: Record<string, { icon: typeof Siren; color: string }> = {
-                              "응급출동": { icon: Siren, color: "text-red-500" },
-                              "행정": { icon: Landmark, color: "text-indigo-500" },
-                              "교통": { icon: Car, color: "text-sky-500" },
-                              "인프라": { icon: Building2, color: "text-amber-500" },
-                              "환경": { icon: TreePine, color: "text-emerald-500" },
-                              "인구": { icon: Users, color: "text-violet-500" },
-                              "물류": { icon: Package, color: "text-orange-500" },
-                              "에너지": { icon: Zap, color: "text-yellow-500" },
+                            const iconMap: Record<string, typeof Siren> = {
+                              "응급출동": Siren, "행정": Landmark, "교통": Car,
+                              "인프라": Building2, "환경": TreePine, "인구": Users,
+                              "물류": Package, "에너지": Zap,
                             };
                             const fallbackIcons = [Hash, Globe, Map, Layers];
-                            const fallbackColors = ["text-teal-500", "text-cyan-500", "text-blue-500", "text-pink-500"];
-                            const match = iconMap[cat];
-                            const Icon = match?.icon || fallbackIcons[cat.length % fallbackIcons.length];
-                            const iconColor = match?.color || fallbackColors[cat.length % fallbackColors.length];
-                            return <Icon className={`w-3 h-3 ${iconColor}`} />;
+                            const Icon = iconMap[cat] || fallbackIcons[cat.length % fallbackIcons.length];
+                            return <Icon className="w-3 h-3 text-primary" />;
                           })()}
                           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{cat}</span>
                         </div>
