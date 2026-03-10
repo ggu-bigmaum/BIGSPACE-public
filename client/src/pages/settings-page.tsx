@@ -904,7 +904,7 @@ function LayerCard({ layer, onUpdate, onDelete }: {
   };
 
   return (
-    <div className="border rounded-lg p-4 space-y-4" data-testid={`layer-card-${layer.id}`}>
+    <div className="border rounded-lg p-3 space-y-3" data-testid={`layer-card-${layer.id}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div
@@ -942,7 +942,7 @@ function LayerCard({ layer, onUpdate, onDelete }: {
         <p className="text-xs text-muted-foreground">{layer.description}</p>
       )}
 
-      <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+      <div className="grid grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-3">
         <div className="space-y-1">
           <Label className="text-[11px] text-muted-foreground">카테고리</Label>
           <Input
