@@ -175,7 +175,7 @@ export function AppSidebar({
                                   onLayerToggle?.(layer.id, checked);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="mt-0.5 data-[state=checked]:bg-primary"
+                                className="mt-0.5 h-4 w-7 data-[state=checked]:bg-primary [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
                                 data-testid={`switch-toggle-visibility-${layer.id}`}
                               />
                               <div className="flex-1 min-w-0">
