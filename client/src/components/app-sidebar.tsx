@@ -18,7 +18,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu, Tag,
+  Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu,
+  Siren, Landmark, Car, Building2, TreePine, Users, Package, Zap, Hash,
 } from "lucide-react";
 import {
   Tooltip,
@@ -202,7 +203,16 @@ export function AppSidebar({
                     <div key={cat}>
                       {categories.length > 1 && (
                         <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1" data-testid={`category-label-${cat}`}>
-                          <Tag className="w-3 h-3 text-muted-foreground" />
+                          {(() => {
+                            const iconMap: Record<string, typeof Siren> = {
+                              "응급출동": Siren, "행정": Landmark, "교통": Car,
+                              "인프라": Building2, "환경": TreePine, "인구": Users,
+                              "물류": Package, "에너지": Zap,
+                            };
+                            const fallbackIcons = [Hash, Globe, Map, Layers];
+                            const Icon = iconMap[cat] || fallbackIcons[cat.length % fallbackIcons.length];
+                            return <Icon className="w-3 h-3 text-muted-foreground" />;
+                          })()}
                           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{cat}</span>
                         </div>
                       )}
