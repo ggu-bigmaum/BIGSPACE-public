@@ -19,6 +19,7 @@ import {
   Map, Globe, Eye, EyeOff, Star, Trash2, Key, Info,
   Layers, Gauge, Plus, Cpu, Server, Cloud,
   CheckCircle2, Settings2, Sun, Moon, Palette, X,
+  ChevronDown, ChevronRight, FolderOpen,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
@@ -78,6 +79,7 @@ function BasemapCard({ basemap, onUpdate, onDelete, onSetDefault }: {
         <Switch
           checked={basemap.enabled}
           onCheckedChange={(enabled) => onUpdate(basemap.id, { enabled })}
+          className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
           data-testid={`switch-basemap-enabled-${basemap.id}`}
         />
       </div>
@@ -1085,6 +1087,7 @@ function LayerCard({ layer, onUpdate, onDelete }: {
             <Switch
               checked={merged.tileEnabled}
               onCheckedChange={(v) => onUpdate(layer.id, { tileEnabled: v })}
+              className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
               data-testid={`switch-tile-enabled-${layer.id}`}
             />
             <Label className="text-xs">타일 캐싱</Label>
@@ -1130,17 +1133,40 @@ function LayersSection({ layers, onUpdate, onDelete }: {
     return acc;
   }, {});
   const categories = Object.keys(grouped);
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    categories.forEach(c => { init[c] = true; });
+    return init;
+  });
+
+  const toggleCat = (cat: string) => {
+    setExpandedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
+  const allExpanded = categories.every(c => expandedCats[c] !== false);
+  const toggleAll = () => {
+    const next: Record<string, boolean> = {};
+    categories.forEach(c => { next[c] = !allExpanded; });
+    setExpandedCats(next);
+  };
 
   return (
-    <div className="space-y-6" data-testid="section-layers">
-      <div>
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Layers className="w-5 h-5" />
-          레이어 관리
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          등록된 레이어의 스타일, 렌더링 설정을 관리합니다. 총 {layers.length}개 레이어, {categories.length}개 카테고리.
-        </p>
+    <div className="space-y-4" data-testid="section-layers">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Layers className="w-5 h-5" />
+            레이어 관리
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            총 {layers.length}개 레이어, {categories.length}개 카테고리
+          </p>
+        </div>
+        {categories.length > 1 && (
+          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={toggleAll} data-testid="button-toggle-all-categories">
+            {allExpanded ? "모두 접기" : "모두 펼치기"}
+          </Button>
+        )}
       </div>
 
       <Separator />
@@ -1152,27 +1178,42 @@ function LayersSection({ layers, onUpdate, onDelete }: {
           <p className="text-xs mt-1">사이드바에서 새 레이어를 추가할 수 있습니다.</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {categories.map((cat) => (
-            <div key={cat} className="space-y-3" data-testid={`layer-category-${cat}`}>
-              {categories.length > 1 && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs" data-testid={`badge-category-${cat}`}>
-                    {cat}
-                  </Badge>
-                  <span className="text-[10px] text-muted-foreground">{grouped[cat].length}개 레이어</span>
-                </div>
-              )}
-              {grouped[cat].map((layer) => (
-                <LayerCard
-                  key={layer.id}
-                  layer={layer}
-                  onUpdate={onUpdate}
-                  onDelete={onDelete}
-                />
-              ))}
-            </div>
-          ))}
+        <div className="space-y-3">
+          {categories.map((cat) => {
+            const isExpanded = expandedCats[cat] !== false;
+            return (
+              <div key={cat} className="border rounded-lg overflow-hidden" data-testid={`layer-category-${cat}`}>
+                <button
+                  className="w-full flex items-center justify-between px-3 py-2 bg-muted/40 hover:bg-muted/70 transition-colors text-left"
+                  onClick={() => toggleCat(cat)}
+                  data-testid={`button-toggle-category-${cat}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold">{cat}</span>
+                    <span className="text-[10px] text-muted-foreground">{grouped[cat].length}개</span>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                </button>
+                {isExpanded && (
+                  <div className="p-3 space-y-3">
+                    {grouped[cat].map((layer) => (
+                      <LayerCard
+                        key={layer.id}
+                        layer={layer}
+                        onUpdate={onUpdate}
+                        onDelete={onDelete}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
