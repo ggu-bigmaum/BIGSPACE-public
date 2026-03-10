@@ -308,7 +308,7 @@ export function AppSidebar({
       </SidebarContent>
 
       <Separator />
-      <SidebarFooter className="p-2 flex flex-row items-center justify-center gap-1">
+      <SidebarFooter className="p-2 flex flex-row items-center justify-end gap-1">
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>
