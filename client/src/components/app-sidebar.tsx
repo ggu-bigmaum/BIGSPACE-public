@@ -20,6 +20,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu, FolderOpen,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
@@ -76,6 +82,17 @@ export function AppSidebar({
     RASTER: "bg-violet-600/20 text-violet-400 border-violet-500/30",
     DEM: "bg-amber-600/20 text-amber-400 border-amber-500/30",
     HEATMAP: "bg-rose-600/20 text-rose-400 border-rose-500/30",
+  };
+
+  const badgeShortLabel: Record<string, string> = {
+    VECTOR: "(V)", RASTER: "(R)", DEM: "(D)", HEATMAP: "(H)",
+  };
+
+  const badgeTooltip: Record<string, string> = {
+    VECTOR: "Vector Data Source",
+    RASTER: "Raster Data Source",
+    DEM: "Digital Elevation Model",
+    HEATMAP: "Heatmap Layer",
   };
 
   return (
@@ -175,13 +192,24 @@ export function AppSidebar({
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-1">
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-[9px] px-1.5 py-0 h-4 font-semibold tracking-wider border ${badgeClass} no-default-hover-elevate no-default-active-elevate`}
-                                    data-testid={`badge-layer-type-${layer.id}`}
-                                  >
-                                    {typeBadge}
-                                  </Badge>
+                                  <TooltipProvider delayDuration={300}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span>
+                                          <Badge
+                                            variant="outline"
+                                            className={`text-[9px] px-1 py-0 h-4 font-semibold tracking-wider border ${badgeClass} no-default-hover-elevate no-default-active-elevate`}
+                                            data-testid={`badge-layer-type-${layer.id}`}
+                                          >
+                                            {badgeShortLabel[typeBadge] || typeBadge}
+                                          </Badge>
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="bottom" className="text-xs">
+                                        {badgeTooltip[typeBadge] || typeBadge}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                   <span className="text-[9px] text-muted-foreground">·</span>
                                   <span className="text-[9px] text-muted-foreground" data-testid={`text-layer-size-${layer.id}`}>
                                     {sizeLabel}
