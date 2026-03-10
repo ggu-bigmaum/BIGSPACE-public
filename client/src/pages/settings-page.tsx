@@ -279,6 +279,16 @@ export default function SettingsPopup({ open, onClose }: SettingsPopupProps) {
     apiKey: "",
   });
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    if (open) {
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [open, onClose]);
+
   const { data: layerList = [] } = useQuery<Layer[]>({
     queryKey: ["/api/layers"],
   });
