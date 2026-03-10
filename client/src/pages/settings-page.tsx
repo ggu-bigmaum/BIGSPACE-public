@@ -61,7 +61,7 @@ function BasemapCard({ basemap, onUpdate, onDelete, onSetDefault }: {
   const needsApiKey = basemap.provider !== "osm";
 
   return (
-    <div className={`border rounded-lg p-4 space-y-3 transition-colors ${basemap.enabled ? "border-border" : "border-border/50 opacity-60"}`}
+    <div className={`border rounded-lg p-4 space-y-3 transition-colors ${basemap.enabled ? "" : "opacity-60"}`}
       data-testid={`basemap-card-${basemap.id}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
