@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { LAYER_PALETTE, getNextColor } from "@/lib/colorPalette";
+import type { Layer } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +23,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Plus, Loader2 } from "lucide-react";
+import { Upload, Plus, Loader2, Check } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AddLayerDialogProps {
   open: boolean;
@@ -37,10 +44,23 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
   const [renderMode, setRenderMode] = useState("auto");
   const [featureLimit, setFeatureLimit] = useState("2000");
   const [minZoom, setMinZoom] = useState("15");
-  const [strokeColor, setStrokeColor] = useState("#3b82f6");
-  const [fillColor, setFillColor] = useState("#3b82f680");
+  const [strokeColor, setStrokeColor] = useState("#0d9488");
+  const [fillColor, setFillColor] = useState("#0d948850");
   const [geojsonInput, setGeojsonInput] = useState("");
   const [activeTab, setActiveTab] = useState("empty");
+
+  const { data: layers = [] } = useQuery<Layer[]>({
+    queryKey: ["/api/layers"],
+  });
+
+  useEffect(() => {
+    if (open) {
+      const existing = layers.map((l) => l.strokeColor);
+      const next = getNextColor(existing);
+      setStrokeColor(next.strokeColor);
+      setFillColor(next.fillColor);
+    }
+  }, [open, layers]);
 
   const createLayerMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -58,12 +78,12 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
               : [{ type: "Feature", geometry: parsed, properties: {} }];
 
           await apiRequest("POST", `/api/layers/${layer.id}/features`, featuresToUpload);
-          toast({ title: "Layer created with features", description: `${featuresToUpload.length} features imported` });
+          toast({ title: "레이어가 생성되었습니다", description: `${featuresToUpload.length}개 피처가 가져와졌습니다` });
         } catch (e: any) {
-          toast({ title: "Layer created", description: "But GeoJSON import failed: " + e.message, variant: "destructive" });
+          toast({ title: "레이어 생성 완료", description: "GeoJSON 가져오기 실패: " + e.message, variant: "destructive" });
         }
       } else {
-        toast({ title: "Layer created", description: `"${layer.name}" is ready` });
+        toast({ title: "레이어 생성 완료", description: `"${layer.name}" 레이어가 준비되었습니다` });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/layers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
@@ -71,7 +91,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
       onOpenChange(false);
     },
     onError: (e: any) => {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: "오류", description: e.message, variant: "destructive" });
     },
   });
 
@@ -83,15 +103,15 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
     setRenderMode("auto");
     setFeatureLimit("2000");
     setMinZoom("15");
-    setStrokeColor("#3b82f6");
-    setFillColor("#3b82f680");
+    setStrokeColor("#0d9488");
+    setFillColor("#0d948850");
     setGeojsonInput("");
     setActiveTab("empty");
   };
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      toast({ title: "Name required", variant: "destructive" });
+      toast({ title: "이름을 입력해주세요", variant: "destructive" });
       return;
     }
     createLayerMutation.mutate({
@@ -107,22 +127,27 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
     });
   };
 
+  const selectPaletteColor = (stroke: string, fill: string) => {
+    setStrokeColor(stroke);
+    setFillColor(fill);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add New Layer</DialogTitle>
+          <DialogTitle>새 레이어 추가</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <Label htmlFor="layer-name">Layer Name</Label>
+              <Label htmlFor="layer-name">레이어 이름</Label>
               <Input
                 id="layer-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Public Facilities"
+                placeholder="예: 공공시설물"
                 data-testid="input-layer-name"
               />
             </div>
@@ -163,16 +188,16 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
               </Select>
             </div>
             <div>
-              <Label>Render Mode</Label>
+              <Label>렌더 모드</Label>
               <Select value={renderMode} onValueChange={setRenderMode}>
                 <SelectTrigger data-testid="select-render-mode">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="feature">Feature</SelectItem>
-                  <SelectItem value="tile">Tile</SelectItem>
-                  <SelectItem value="aggregate">Aggregate</SelectItem>
+                  <SelectItem value="auto">자동</SelectItem>
+                  <SelectItem value="feature">피처</SelectItem>
+                  <SelectItem value="tile">타일</SelectItem>
+                  <SelectItem value="aggregate">집계</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -180,7 +205,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Feature Limit</Label>
+              <Label>피처 제한</Label>
               <Input
                 type="number"
                 value={featureLimit}
@@ -189,7 +214,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
               />
             </div>
             <div>
-              <Label>Detail Zoom Level</Label>
+              <Label>상세 줌 레벨</Label>
               <Input
                 type="number"
                 value={minZoom}
@@ -201,31 +226,54 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Stroke Color</Label>
+          <div className="space-y-2">
+            <Label>색상</Label>
+            <div className="flex flex-wrap gap-1.5" data-testid="palette-swatches">
+              {LAYER_PALETTE.map((color) => (
+                <Tooltip key={color.strokeColor}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => selectPaletteColor(color.strokeColor, color.fillColor)}
+                      className={`w-6 h-6 rounded-md border-2 transition-all flex items-center justify-center ${
+                        strokeColor === color.strokeColor
+                          ? "border-foreground scale-110 shadow-sm"
+                          : "border-transparent hover:border-muted-foreground/30 hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: color.strokeColor }}
+                      data-testid={`palette-color-${color.label}`}
+                    >
+                      {strokeColor === color.strokeColor && (
+                        <Check className="w-3 h-3 text-white" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    {color.label}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-2">
               <div className="flex items-center gap-2">
                 <input
                   type="color"
                   value={strokeColor}
                   onChange={(e) => setStrokeColor(e.target.value)}
-                  className="w-8 h-8 rounded border cursor-pointer"
+                  className="w-7 h-7 rounded border cursor-pointer"
                   data-testid="input-stroke-color"
                 />
-                <Input value={strokeColor} onChange={(e) => setStrokeColor(e.target.value)} className="flex-1" />
+                <span className="text-[10px] text-muted-foreground">선</span>
               </div>
-            </div>
-            <div>
-              <Label>Fill Color</Label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
                   value={fillColor.slice(0, 7)}
-                  onChange={(e) => setFillColor(e.target.value + "80")}
-                  className="w-8 h-8 rounded border cursor-pointer"
+                  onChange={(e) => setFillColor(e.target.value + "50")}
+                  className="w-7 h-7 rounded border cursor-pointer"
                   data-testid="input-fill-color"
                 />
-                <Input value={fillColor} onChange={(e) => setFillColor(e.target.value)} className="flex-1" />
+                <span className="text-[10px] text-muted-foreground">채우기</span>
               </div>
             </div>
           </div>
@@ -234,18 +282,18 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
             <TabsList className="w-full">
               <TabsTrigger value="empty" className="flex-1" data-testid="tab-empty">
                 <Plus className="w-3.5 h-3.5 mr-1" />
-                Empty Layer
+                빈 레이어
               </TabsTrigger>
               <TabsTrigger value="geojson" className="flex-1" data-testid="tab-geojson">
                 <Upload className="w-3.5 h-3.5 mr-1" />
-                Import GeoJSON
+                GeoJSON 가져오기
               </TabsTrigger>
             </TabsList>
             <TabsContent value="geojson" className="mt-2">
               <Textarea
                 value={geojsonInput}
                 onChange={(e) => setGeojsonInput(e.target.value)}
-                placeholder='Paste GeoJSON here (FeatureCollection, Feature, or Geometry)...'
+                placeholder='GeoJSON을 여기에 붙여넣으세요 (FeatureCollection, Feature, 또는 Geometry)...'
                 className="font-mono text-xs min-h-[120px]"
                 data-testid="textarea-geojson"
               />
@@ -255,7 +303,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
 
         <DialogFooter>
           <Button variant="secondary" onClick={() => onOpenChange(false)} data-testid="button-cancel-layer">
-            Cancel
+            취소
           </Button>
           <Button
             onClick={handleSubmit}
@@ -263,7 +311,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
             data-testid="button-create-layer"
           >
             {createLayerMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Create Layer
+            레이어 생성
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
+import { LAYER_PALETTE } from "@/lib/colorPalette";
+import { Check } from "lucide-react";
 
 type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" | "ml-server";
 
@@ -1004,31 +1006,60 @@ function LayerCard({ layer, onUpdate, onDelete }: {
           </div>
         </div>
 
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">선 색상</Label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={merged.strokeColor}
-              onChange={(e) => debouncedUpdate("strokeColor", e.target.value)}
-              className="w-8 h-8 rounded border cursor-pointer"
-              data-testid={`color-stroke-${layer.id}`}
-            />
-            <span className="text-[10px] font-mono text-muted-foreground">{merged.strokeColor}</span>
+        <div className="space-y-1.5">
+          <Label className="text-[11px] text-muted-foreground">색상 프리셋</Label>
+          <div className="flex flex-wrap gap-1" data-testid={`palette-swatches-${layer.id}`}>
+            {LAYER_PALETTE.map((color) => (
+              <button
+                key={color.strokeColor}
+                type="button"
+                onClick={() => {
+                  debouncedUpdate("strokeColor", color.strokeColor);
+                  debouncedUpdate("fillColor", color.fillColor);
+                }}
+                className={`w-5 h-5 rounded border-2 transition-all flex items-center justify-center ${
+                  merged.strokeColor === color.strokeColor
+                    ? "border-foreground scale-110"
+                    : "border-transparent hover:border-muted-foreground/30 hover:scale-105"
+                }`}
+                style={{ backgroundColor: color.strokeColor }}
+                title={color.label}
+                data-testid={`palette-${layer.id}-${color.label}`}
+              >
+                {merged.strokeColor === color.strokeColor && (
+                  <Check className="w-2.5 h-2.5 text-white" />
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">채우기 색상</Label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={(merged.fillColor ?? "").substring(0, 7)}
-              onChange={(e) => debouncedUpdate("fillColor", e.target.value + "80")}
-              className="w-8 h-8 rounded border cursor-pointer"
-              data-testid={`color-fill-${layer.id}`}
-            />
-            <span className="text-[10px] font-mono text-muted-foreground">{merged.fillColor}</span>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">선 색상</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={merged.strokeColor}
+                onChange={(e) => debouncedUpdate("strokeColor", e.target.value)}
+                className="w-7 h-7 rounded border cursor-pointer"
+                data-testid={`color-stroke-${layer.id}`}
+              />
+              <span className="text-[10px] font-mono text-muted-foreground">{merged.strokeColor}</span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">채우기 색상</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={(merged.fillColor ?? "").substring(0, 7)}
+                onChange={(e) => debouncedUpdate("fillColor", e.target.value + "50")}
+                className="w-7 h-7 rounded border cursor-pointer"
+                data-testid={`color-fill-${layer.id}`}
+              />
+              <span className="text-[10px] font-mono text-muted-foreground">{merged.fillColor}</span>
+            </div>
           </div>
         </div>
 
