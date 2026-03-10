@@ -228,24 +228,22 @@ export function AppSidebar({
                                 className="mt-0.5 h-4 w-7 data-[state=checked]:bg-primary [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
                                 data-testid={`switch-toggle-visibility-${layer.id}`}
                               />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <div
-                                    className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                                    style={{ backgroundColor: layer.fillColor, border: `1px solid ${layer.strokeColor}` }}
-                                  />
-                                  <span
-                                    className={`text-xs font-medium truncate ${!layer.visible ? "text-muted-foreground" : ""}`}
-                                    data-testid={`text-layer-name-${layer.id}`}
-                                  >
-                                    {layer.name}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5 mt-1">
+                              <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                                  style={{ backgroundColor: layer.fillColor, border: `1px solid ${layer.strokeColor}` }}
+                                />
+                                <span
+                                  className={`text-xs font-medium truncate ${!layer.visible ? "text-muted-foreground" : ""}`}
+                                  data-testid={`text-layer-name-${layer.id}`}
+                                >
+                                  {layer.name}
+                                </span>
+                                <div className="flex items-center gap-1 ml-auto flex-shrink-0">
                                   <TooltipProvider delayDuration={300}>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <span data-testid={`badge-layer-type-${layer.id}`} className="scale-[0.7] origin-left inline-flex">
+                                        <span data-testid={`badge-layer-type-${layer.id}`} className="scale-[0.7] origin-right inline-flex">
                                           {badgeStyle === "pill" && (
                                             <span className={`inline-flex items-center justify-center h-4 px-1.5 rounded-full ${BADGE_COLOR_SOLID[typeBadge]} text-white text-[9px] font-bold shadow-sm`}>
                                               {BADGE_SHORT[typeBadge]}
