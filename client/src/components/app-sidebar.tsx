@@ -240,6 +240,10 @@ export function AppSidebar({
                                   {layer.name}
                                 </span>
                                 <div className="flex items-center gap-1 ml-auto flex-shrink-0">
+                                  <span className="text-[9px] text-muted-foreground" data-testid={`text-layer-size-${layer.id}`}>
+                                    {sizeLabel}
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground">·</span>
                                   <TooltipProvider delayDuration={300}>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
@@ -277,10 +281,6 @@ export function AppSidebar({
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
-                                  <span className="text-[9px] text-muted-foreground">·</span>
-                                  <span className="text-[9px] text-muted-foreground" data-testid={`text-layer-size-${layer.id}`}>
-                                    {sizeLabel}
-                                  </span>
                                 </div>
                               </div>
                             </div>
