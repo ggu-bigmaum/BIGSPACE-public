@@ -232,6 +232,88 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarGroup>
+          <div className="px-3 pt-2 pb-3">
+            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">배지 디자인 미리보기</div>
+            <div className="space-y-2.5 bg-card/60 rounded-lg p-2.5 border border-border/50">
+
+              <div className="flex items-center gap-2" data-testid="badge-preview-1">
+                <span className="text-[10px] text-muted-foreground w-3">①</span>
+                <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-sm">V</span>
+                <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-violet-500 text-white text-[10px] font-bold shadow-sm">R</span>
+                <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-amber-500 text-white text-[10px] font-bold shadow-sm">D</span>
+                <span className="inline-flex items-center justify-center h-5 px-2 rounded-full bg-rose-500 text-white text-[10px] font-bold shadow-sm">H</span>
+                <span className="text-[9px] text-muted-foreground/70 ml-auto">Pill 채움</span>
+              </div>
+
+              <div className="flex items-center gap-2" data-testid="badge-preview-2">
+                <span className="text-[10px] text-muted-foreground w-3">②</span>
+                <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-md bg-emerald-500/15 text-emerald-500 text-[10px] font-semibold border border-emerald-500/25">
+                  <Layers className="w-3 h-3" />V
+                </span>
+                <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-md bg-violet-500/15 text-violet-500 text-[10px] font-semibold border border-violet-500/25">
+                  <Layers className="w-3 h-3" />R
+                </span>
+                <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-md bg-amber-500/15 text-amber-500 text-[10px] font-semibold border border-amber-500/25">
+                  <Layers className="w-3 h-3" />D
+                </span>
+                <span className="inline-flex items-center gap-1 h-5 px-1.5 rounded-md bg-rose-500/15 text-rose-500 text-[10px] font-semibold border border-rose-500/25">
+                  <Layers className="w-3 h-3" />H
+                </span>
+                <span className="text-[9px] text-muted-foreground/70 ml-auto">아이콘</span>
+              </div>
+
+              <div className="flex items-center gap-2" data-testid="badge-preview-3">
+                <span className="text-[10px] text-muted-foreground w-3">③</span>
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />벡터
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] text-violet-400 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-violet-400" />래스터
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />DEM
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] text-rose-400 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-rose-400" />히트맵
+                </span>
+                <span className="text-[9px] text-muted-foreground/70 ml-auto">도트</span>
+              </div>
+
+              <div className="flex items-center gap-2" data-testid="badge-preview-4">
+                <span className="text-[10px] text-muted-foreground w-3">④</span>
+                <span className="inline-flex flex-col items-center">
+                  <span className="text-[10px] font-semibold text-emerald-400">V</span>
+                  <span className="w-4 h-[2px] rounded-full bg-emerald-400 mt-0.5" />
+                </span>
+                <span className="inline-flex flex-col items-center">
+                  <span className="text-[10px] font-semibold text-violet-400">R</span>
+                  <span className="w-4 h-[2px] rounded-full bg-violet-400 mt-0.5" />
+                </span>
+                <span className="inline-flex flex-col items-center">
+                  <span className="text-[10px] font-semibold text-amber-400">D</span>
+                  <span className="w-4 h-[2px] rounded-full bg-amber-400 mt-0.5" />
+                </span>
+                <span className="inline-flex flex-col items-center">
+                  <span className="text-[10px] font-semibold text-rose-400">H</span>
+                  <span className="w-4 h-[2px] rounded-full bg-rose-400 mt-0.5" />
+                </span>
+                <span className="text-[9px] text-muted-foreground/70 ml-auto">밑줄</span>
+              </div>
+
+              <div className="flex items-center gap-2" data-testid="badge-preview-5">
+                <span className="text-[10px] text-muted-foreground w-3">⑤</span>
+                <span className="inline-flex items-center justify-center h-5 px-2 rounded-md text-[10px] font-bold text-white shadow-sm bg-gradient-to-r from-emerald-500 to-teal-400">V</span>
+                <span className="inline-flex items-center justify-center h-5 px-2 rounded-md text-[10px] font-bold text-white shadow-sm bg-gradient-to-r from-violet-500 to-purple-400">R</span>
+                <span className="inline-flex items-center justify-center h-5 px-2 rounded-md text-[10px] font-bold text-white shadow-sm bg-gradient-to-r from-amber-500 to-orange-400">D</span>
+                <span className="inline-flex items-center justify-center h-5 px-2 rounded-md text-[10px] font-bold text-white shadow-sm bg-gradient-to-r from-rose-500 to-pink-400">H</span>
+                <span className="text-[9px] text-muted-foreground/70 ml-auto">그라데이션</span>
+              </div>
+
+            </div>
+          </div>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="p-3 space-y-1">
