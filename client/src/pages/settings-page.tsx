@@ -420,7 +420,7 @@ export default function SettingsPopup({ open, onClose }: SettingsPopupProps) {
   return (
     <div className="fixed inset-0 z-50" data-testid="settings-popup">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute inset-0 flex items-center justify-center pt-[10px] pl-[10px] pr-[100px] pb-[100px]">
+      <div className="absolute inset-0 flex items-center justify-center pt-[15px] pl-[15px] pr-[15px] pb-[15px]">
         <div className="relative w-full h-full bg-background rounded-xl border shadow-2xl flex overflow-hidden">
           <div className="w-52 border-r bg-card/80 flex flex-col flex-shrink-0">
             <div className="p-4 border-b">
