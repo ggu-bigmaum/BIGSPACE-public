@@ -137,6 +137,8 @@ export function MapViewer({
   const radiusLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<Overlay | null>(null);
+  const searchMarkerRef = useRef<Overlay | null>(null);
+  const searchMarkerElRef = useRef<HTMLDivElement | null>(null);
   const [currentZoom, setCurrentZoom] = useState(11);
   const [cursorCoord, setCursorCoord] = useState<[number, number] | null>(null);
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
@@ -218,6 +220,30 @@ export function MapViewer({
       overlayRef.current = overlay;
     }
 
+    const markerEl = document.createElement("div");
+    markerEl.className = "search-marker";
+    markerEl.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));">
+        <svg width="32" height="42" viewBox="0 0 32 42">
+          <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 26 16 26s16-14 16-26C32 7.163 24.837 0 16 0z" fill="#ef4444"/>
+          <circle cx="16" cy="15" r="7" fill="white"/>
+          <circle cx="16" cy="15" r="3.5" fill="#ef4444"/>
+        </svg>
+        <div style="font-size:11px;font-weight:600;color:white;background:rgba(0,0,0,0.7);padding:2px 8px;border-radius:4px;margin-top:4px;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;" class="search-marker-label"></div>
+      </div>
+    `;
+    markerEl.style.display = "none";
+    document.body.appendChild(markerEl);
+    searchMarkerElRef.current = markerEl;
+
+    const searchMarkerOverlay = new Overlay({
+      element: markerEl,
+      positioning: "top-center",
+      stopEvent: false,
+    });
+    map.addOverlay(searchMarkerOverlay);
+    searchMarkerRef.current = searchMarkerOverlay;
+
     map.on("moveend", () => {
       const view = map.getView();
       const zoom = view.getZoom() || 11;
@@ -245,6 +271,11 @@ export function MapViewer({
       const coord = toLonLat(e.coordinate);
       onMapClick?.(coord[0], coord[1]);
 
+      if (searchMarkerRef.current?.getPosition()) {
+        searchMarkerRef.current.setPosition(undefined);
+        if (searchMarkerElRef.current) searchMarkerElRef.current.style.display = "none";
+      }
+
       let clicked = false;
       map.forEachFeatureAtPixel(e.pixel, (feature) => {
         if (clicked) return;
@@ -267,6 +298,10 @@ export function MapViewer({
     return () => {
       map.setTarget(undefined);
       mapInstance.current = null;
+      if (searchMarkerElRef.current) {
+        searchMarkerElRef.current.remove();
+        searchMarkerElRef.current = null;
+      }
     };
   }, []);
 
@@ -482,11 +517,29 @@ export function MapViewer({
     }
   }, []);
 
-  const moveToLocation = useCallback((lat: number, lng: number, zoom = 15) => {
+  const showSearchMarker = useCallback((lat: number, lng: number, label?: string) => {
+    if (!searchMarkerRef.current || !searchMarkerElRef.current) return;
+    const coord = fromLonLat([lng, lat]);
+    searchMarkerRef.current.setPosition(coord);
+    searchMarkerElRef.current.style.display = "block";
+    const labelEl = searchMarkerElRef.current.querySelector(".search-marker-label") as HTMLElement;
+    if (labelEl) {
+      labelEl.textContent = label || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+  }, []);
+
+  const hideSearchMarker = useCallback(() => {
+    if (!searchMarkerRef.current || !searchMarkerElRef.current) return;
+    searchMarkerRef.current.setPosition(undefined);
+    searchMarkerElRef.current.style.display = "none";
+  }, []);
+
+  const moveToLocation = useCallback((lat: number, lng: number, zoom = 15, label?: string) => {
     if (!mapInstance.current) return;
     const view = mapInstance.current.getView();
     view.animate({ center: fromLonLat([lng, lat]), zoom, duration: 500 });
-  }, []);
+    showSearchMarker(lat, lng, label);
+  }, [showSearchMarker]);
 
   const searchByGeocode = useCallback(async (query: string) => {
     setSearchLoading(true);
@@ -507,9 +560,10 @@ export function MapViewer({
       const data = await resp.json();
       setGeocodeResults(data);
       if (data.length === 1) {
-        moveToLocation(parseFloat(data[0].lat), parseFloat(data[0].lon));
+        const name = data[0].display_name.split(",")[0];
+        moveToLocation(parseFloat(data[0].lat), parseFloat(data[0].lon), 15, name);
         setShowSearchResults(false);
-        setSearchQuery(data[0].display_name.split(",")[0]);
+        setSearchQuery(name);
       }
     } catch {
       setGeocodeResults([]);
@@ -534,7 +588,7 @@ export function MapViewer({
         lat = a; lng = b;
       }
       if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-        moveToLocation(lat, lng);
+        moveToLocation(lat, lng, 15, `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
         setSearchQuery("");
         setShowSearchResults(false);
         return;
@@ -544,8 +598,9 @@ export function MapViewer({
   }, [searchQuery, moveToLocation, searchByGeocode]);
 
   const handleSelectResult = useCallback((result: { display_name: string; lat: string; lon: string }) => {
-    moveToLocation(parseFloat(result.lat), parseFloat(result.lon));
-    setSearchQuery(result.display_name.split(",")[0]);
+    const name = result.display_name.split(",")[0];
+    moveToLocation(parseFloat(result.lat), parseFloat(result.lon), 15, name);
+    setSearchQuery(name);
     setShowSearchResults(false);
     setGeocodeResults([]);
   }, [moveToLocation]);
