@@ -17,16 +17,16 @@ import {
 } from "@/components/ui/select";
 import {
   Map, Globe, Eye, EyeOff, Star, Trash2, Key, Info,
-  Layers, Gauge, Plus, Cpu, Server, Cloud,
+  Layers, Gauge, Plus, Cpu, Server, Cloud, Package,
   CheckCircle2, Settings2, Sun, Moon, Palette, X,
-  ChevronDown, ChevronRight, Tag,
+  ChevronDown, ChevronRight, Tag, Building2, Share2, BarChart3,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
 import { LAYER_PALETTE } from "@/lib/colorPalette";
 import { Check } from "lucide-react";
 
-type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" | "ml-server";
+type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" | "ml-server" | "products";
 
 interface SettingsPopupProps {
   open: boolean;
@@ -41,6 +41,7 @@ const NAV_ITEMS: { id: SettingsSection; label: string; icon: typeof Settings2 }[
   { id: "rendering", label: "렌더링", icon: Gauge },
   { id: "map", label: "지도", icon: Map },
   { id: "ml-server", label: "ML 연산", icon: Cpu },
+  { id: "products", label: "제품 라인업", icon: Package },
 ];
 
 function BasemapCard({ basemap, onUpdate, onDelete, onSetDefault }: {
@@ -428,6 +429,8 @@ export default function SettingsPopup({ open, onClose, onAddLayer }: SettingsPop
         );
       case "ml-server":
         return <MLServerSection />;
+      case "products":
+        return <ProductsSection />;
       default:
         return null;
     }
@@ -671,9 +674,9 @@ function GeneralSection({ theme, setTheme }: { theme: string; setTheme: (t: "lig
           </h3>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <span className="text-muted-foreground">제품명</span>
-            <span>GIS 업무 솔루션</span>
+            <span>BIGSPACE Public</span>
             <span className="text-muted-foreground">버전</span>
-            <span>v1.0 Enterprise Edition</span>
+            <span>v1.0 공공기관</span>
             <span className="text-muted-foreground">좌표계</span>
             <span>EPSG:4326 (WGS84)</span>
             <span className="text-muted-foreground">데이터베이스</span>
@@ -1439,6 +1442,136 @@ function MLServerSection() {
             서버 연결 설정 및 분석 결과 시각화 기능은 향후 업데이트에서 활성화됩니다.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductsSection() {
+  const products = [
+    {
+      name: "BIGSPACE Public",
+      subtitle: "공공기관",
+      icon: Globe,
+      current: true,
+      color: "text-primary",
+      borderColor: "border-primary/50",
+      bgColor: "bg-primary/5",
+      description: "공공기관 및 지방자치단체를 위한 업무용 GIS 솔루션입니다. 조달청 등록을 통해 공공조달 시장에 공급되며, 공간 데이터 관리·시각화·분석 기능을 통합 제공합니다.",
+      features: [
+        "조달청 나라장터 등록 및 공공조달 납품",
+        "공간 데이터 등록·편집·관리 (벡터/래스터)",
+        "레이어 기반 업무 지도 시각화",
+        "공간 분석 및 통계 (버퍼, 근접, 밀도 분석)",
+        "EPSG:4326/5179/5181 좌표계 지원",
+        "내부망 배포 및 보안 요건 충족",
+      ],
+    },
+    {
+      name: "BIGSPACE Pro",
+      subtitle: "기업",
+      icon: Building2,
+      current: false,
+      color: "text-violet-600 dark:text-violet-400",
+      borderColor: "border-violet-500/30",
+      bgColor: "",
+      description: "기업 환경에 최적화된 고급 GIS 솔루션입니다. 대용량 공간 데이터 처리, 맞춤 워크플로우 자동화, 고급 분석 기능을 제공하여 기업의 공간 의사결정을 지원합니다.",
+      features: [
+        "대용량 데이터 최적화 (수백만 피처 처리)",
+        "맞춤형 워크플로우 자동화 엔진",
+        "고급 공간 분석 및 ML 연동",
+        "역할 기반 접근 제어 (RBAC)",
+        "SSO 및 기업 인증 시스템 연동",
+        "SLA 기반 기술 지원",
+      ],
+    },
+    {
+      name: "BIGSPACE Hub",
+      subtitle: "데이터 공유",
+      icon: Share2,
+      current: false,
+      color: "text-emerald-600 dark:text-emerald-400",
+      borderColor: "border-emerald-500/30",
+      bgColor: "",
+      description: "조직 간 공간 데이터를 안전하게 공유하고 협업할 수 있는 데이터 허브 플랫폼입니다. 표준 API를 통해 외부 시스템과 연동하며, 데이터 카탈로그 및 메타데이터를 관리합니다.",
+      features: [
+        "조직 간 공간 데이터 공유 포털",
+        "데이터 카탈로그 및 메타데이터 관리",
+        "OGC 표준 API (WMS/WFS/WMTS) 지원",
+        "외부 시스템 연동 REST API 제공",
+        "데이터 접근 권한 및 이력 관리",
+        "공간 데이터 품질 검증 도구",
+      ],
+    },
+    {
+      name: "BIGSPACE View",
+      subtitle: "시각화",
+      icon: BarChart3,
+      current: false,
+      color: "text-amber-600 dark:text-amber-400",
+      borderColor: "border-amber-500/30",
+      bgColor: "",
+      description: "경량 지도 뷰어 및 대시보드 솔루션입니다. 별도 설치 없이 웹 브라우저에서 공간 데이터를 시각화하며, 웹사이트나 보고서에 지도를 임베드할 수 있습니다.",
+      features: [
+        "경량 웹 기반 지도 뷰어",
+        "대시보드 및 공간 통계 시각화",
+        "iframe 임베딩 및 공유 링크",
+        "인쇄용 지도 출력 (PDF/PNG)",
+        "모바일 반응형 뷰어",
+        "API 기반 데이터 연동",
+      ],
+    },
+  ];
+
+  return (
+    <div className="space-y-4" data-testid="section-products">
+      <div>
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <Package className="w-5 h-5" />
+          제품 라인업
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          BIGSPACE 플랫폼의 제품군입니다. 각 제품은 대상 고객과 용도에 맞게 구성됩니다.
+        </p>
+      </div>
+
+      <Separator />
+
+      <div className="grid grid-cols-2 gap-4">
+        {products.map((product) => {
+          const Icon = product.icon;
+          return (
+            <div
+              key={product.name}
+              className={`rounded-lg border p-5 space-y-3 transition-all ${product.borderColor} ${product.current ? product.bgColor : "hover:bg-muted/30"}`}
+              data-testid={`product-card-${product.subtitle}`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-md ${product.current ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">{product.name}</h3>
+                    <span className={`text-[10px] font-medium ${product.color}`}>{product.subtitle}</span>
+                  </div>
+                </div>
+                {product.current && (
+                  <Badge variant="default" className="text-[10px] h-5" data-testid="badge-current-product">현재 제품</Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">{product.description}</p>
+              <ul className="space-y-1.5">
+                {product.features.map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs">
+                    <CheckCircle2 className={`w-3 h-3 mt-0.5 flex-shrink-0 ${product.current ? "text-primary" : "text-muted-foreground/50"}`} />
+                    <span className={product.current ? "" : "text-muted-foreground"}>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

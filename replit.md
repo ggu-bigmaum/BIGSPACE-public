@@ -1,7 +1,7 @@
-# GIS 업무 솔루션 - 공간데이터 플랫폼
+# BIGSPACE Public - 공공기관 GIS 솔루션
 
 ## 개요
-조달청 등록을 목표로 하는 업무용 GIS 솔루션. 대용량 공간데이터 관리를 위한 벡터 타일 렌더링 전략 문서 기반. React + Express + PostgreSQL 구성 (PostGIS 미사용 - 애플리케이션 레벨 공간 연산). 다크 네이비/시안 테마, ESRI 위성 배경지도 기본값.
+조달청 등록을 목표로 하는 공공기관용 업무 GIS 솔루션. BIGSPACE 플랫폼 제품군(Public/Pro/Hub/View) 중 공공기관 라인. React + Express + PostgreSQL 구성 (PostGIS 미사용 - 애플리케이션 레벨 공간 연산). 시안 액센트 테마(라이트/다크 전환), ESRI 위성 배경지도 기본값.
 
 ## 아키텍처
 

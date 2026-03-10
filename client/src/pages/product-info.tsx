@@ -82,10 +82,10 @@ export default function ProductInfoPage() {
             <Globe className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-2xl font-bold mb-2" data-testid="text-product-title">
-            GIS 업무 솔루션
+            BIGSPACE Public
           </h1>
           <p className="text-sm text-muted-foreground mb-3" data-testid="text-product-subtitle">
-            고성능 공간정보 관리 플랫폼 · Enterprise Edition
+            공공기관용 고성능 공간정보 관리 플랫폼 · v1.0
           </p>
           <div className="flex items-center justify-center gap-2">
             <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">

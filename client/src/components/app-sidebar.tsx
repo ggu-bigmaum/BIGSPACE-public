@@ -117,8 +117,8 @@ export function AppSidebar({
               <Globe className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold" data-testid="text-app-title">GIS 업무 솔루션</h2>
-              <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v1.0 - Enterprise Edition</p>
+              <h2 className="text-sm font-semibold" data-testid="text-app-title">BIGSPACE Public</h2>
+              <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v1.0 - 공공기관</p>
             </div>
           </div>
           <div className="flex items-center gap-0.5">
