@@ -127,7 +127,7 @@ export function MapViewer({
   onZoomChange,
   radiusCenter,
   radiusKm,
-  searchResults,
+  searchResults: externalSearchResults,
 }: MapViewerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<OlMap | null>(null);
@@ -142,6 +142,9 @@ export function MapViewer({
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
   const [basemapError, setBasemapError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [geocodeResults, setGeocodeResults] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [basemapPickerOpen, setBasemapPickerOpen] = useState(false);
   const tileErrorCountRef = useRef(0);
 
@@ -453,13 +456,13 @@ export function MapViewer({
     if (!source) return;
     source.clear();
 
-    if (searchResults && searchResults.features) {
-      const features = geojsonFormat.readFeatures(searchResults, {
+    if (externalSearchResults && externalSearchResults.features) {
+      const features = geojsonFormat.readFeatures(externalSearchResults, {
         featureProjection: "EPSG:3857",
       });
       source.addFeatures(features);
     }
-  }, [searchResults]);
+  }, [externalSearchResults]);
 
   const handleZoomIn = useCallback(() => {
     if (!mapInstance.current) return;
@@ -479,6 +482,42 @@ export function MapViewer({
     }
   }, []);
 
+  const moveToLocation = useCallback((lat: number, lng: number, zoom = 15) => {
+    if (!mapInstance.current) return;
+    const view = mapInstance.current.getView();
+    view.animate({ center: fromLonLat([lng, lat]), zoom, duration: 500 });
+  }, []);
+
+  const searchByGeocode = useCallback(async (query: string) => {
+    setSearchLoading(true);
+    setShowSearchResults(true);
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        format: "json",
+        limit: "5",
+        addressdetails: "1",
+        "accept-language": "ko",
+        countrycodes: "kr",
+      });
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+        headers: { "User-Agent": "GIS-Solution/1.0" },
+      });
+      if (!resp.ok) throw new Error("Geocoding failed");
+      const data = await resp.json();
+      setGeocodeResults(data);
+      if (data.length === 1) {
+        moveToLocation(parseFloat(data[0].lat), parseFloat(data[0].lon));
+        setShowSearchResults(false);
+        setSearchQuery(data[0].display_name.split(",")[0]);
+      }
+    } catch {
+      setGeocodeResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [moveToLocation]);
+
   const handleSearchGo = useCallback(() => {
     if (!mapInstance.current || !searchQuery.trim()) return;
     const q = searchQuery.trim();
@@ -495,13 +534,21 @@ export function MapViewer({
         lat = a; lng = b;
       }
       if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-        const view = mapInstance.current.getView();
-        view.animate({ center: fromLonLat([lng, lat]), zoom: 15, duration: 500 });
+        moveToLocation(lat, lng);
         setSearchQuery("");
+        setShowSearchResults(false);
         return;
       }
     }
-  }, [searchQuery]);
+    searchByGeocode(q);
+  }, [searchQuery, moveToLocation, searchByGeocode]);
+
+  const handleSelectResult = useCallback((result: { display_name: string; lat: string; lon: string }) => {
+    moveToLocation(parseFloat(result.lat), parseFloat(result.lon));
+    setSearchQuery(result.display_name.split(",")[0]);
+    setShowSearchResults(false);
+    setGeocodeResults([]);
+  }, [moveToLocation]);
 
   return (
     <div className="relative w-full h-full">
@@ -524,22 +571,57 @@ export function MapViewer({
           <Search className="w-4 h-4 text-white/60 flex-shrink-0" />
           <Input
             type="text"
-            placeholder="좌표 검색 (예: 37.5665, 126.978)..."
+            placeholder="주소, 지명 또는 좌표 검색..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (!e.target.value.trim()) {
+                setShowSearchResults(false);
+                setGeocodeResults([]);
+              }
+            }}
+            onFocus={() => { if (geocodeResults.length > 0) setShowSearchResults(true); }}
             className="border-0 bg-transparent text-white placeholder:text-white/40 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
             data-testid="input-map-search"
           />
-          <Button
-            size="icon"
-            variant="ghost"
-            type="submit"
-            className="text-white/60 hover:text-white flex-shrink-0"
-            data-testid="button-map-pin"
-          >
-            <MapPin className="w-4 h-4" />
-          </Button>
+          {searchLoading ? (
+            <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+            </div>
+          ) : (
+            <Button
+              size="icon"
+              variant="ghost"
+              type="submit"
+              className="text-white/60 hover:text-white flex-shrink-0"
+              data-testid="button-map-pin"
+            >
+              <MapPin className="w-4 h-4" />
+            </Button>
+          )}
         </form>
+
+        {showSearchResults && geocodeResults.length > 0 && (
+          <div className="mt-1 bg-black/80 backdrop-blur-md rounded-md border border-white/10 overflow-hidden" data-testid="search-results-dropdown">
+            {geocodeResults.map((result, idx) => (
+              <button
+                key={idx}
+                className="w-full text-left px-3 py-2.5 text-sm text-white/90 hover:bg-white/10 transition-colors flex items-start gap-2 border-b border-white/5 last:border-0"
+                onClick={() => handleSelectResult(result)}
+                data-testid={`search-result-${idx}`}
+              >
+                <MapPin className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                <span className="line-clamp-2 text-xs leading-relaxed">{result.display_name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {showSearchResults && !searchLoading && geocodeResults.length === 0 && searchQuery.trim() && (
+          <div className="mt-1 bg-black/80 backdrop-blur-md rounded-md border border-white/10 px-3 py-3" data-testid="search-no-results">
+            <p className="text-xs text-white/50 text-center">검색 결과가 없습니다</p>
+          </div>
+        )}
       </div>
 
       <div className="absolute top-3 right-3 z-10">
