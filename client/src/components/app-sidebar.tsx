@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu, FolderOpen,
+  Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu, Tag,
 } from "lucide-react";
 import {
   Tooltip,
@@ -202,7 +202,7 @@ export function AppSidebar({
                     <div key={cat}>
                       {categories.length > 1 && (
                         <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1" data-testid={`category-label-${cat}`}>
-                          <FolderOpen className="w-3 h-3 text-muted-foreground" />
+                          <Tag className="w-3 h-3 text-muted-foreground" />
                           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{cat}</span>
                         </div>
                       )}

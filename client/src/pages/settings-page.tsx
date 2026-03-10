@@ -19,7 +19,7 @@ import {
   Map, Globe, Eye, EyeOff, Star, Trash2, Key, Info,
   Layers, Gauge, Plus, Cpu, Server, Cloud,
   CheckCircle2, Settings2, Sun, Moon, Palette, X,
-  ChevronDown, ChevronRight, FolderOpen,
+  ChevronDown, ChevronRight, Tag,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
@@ -1199,7 +1199,7 @@ function LayersSection({ layers, onUpdate, onDelete }: {
                   data-testid={`button-toggle-category-${cat}`}
                 >
                   <div className="flex items-center gap-2">
-                    <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Tag className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="text-xs font-semibold">{cat}</span>
                     <span className="text-[10px] text-muted-foreground">{grouped[cat].length}개</span>
                   </div>
