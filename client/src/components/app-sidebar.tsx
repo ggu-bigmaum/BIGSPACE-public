@@ -122,16 +122,41 @@ export function AppSidebar({
               <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v1.0 - Enterprise Edition</p>
             </div>
           </div>
-          <Link href="/product-info">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              data-testid="button-product-info"
-            >
-              <Info className="w-4 h-4" />
-            </Button>
-          </Link>
+          <div className="flex items-center gap-0.5">
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href="/product-info">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      data-testid="button-product-info"
+                    >
+                      <Info className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">제품 소개</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={onAnalysisOpen}
+                    data-testid="button-spatial-analysis"
+                  >
+                    <Cpu className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">공간 분석</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       </SidebarHeader>
 
@@ -282,36 +307,39 @@ export function AppSidebar({
 
       </SidebarContent>
 
-      <SidebarFooter className="p-3 space-y-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-xs"
-          onClick={onAnalysisOpen}
-          data-testid="button-spatial-analysis"
-        >
-          <Cpu className="w-3.5 h-3.5 mr-2" />
-          공간 분석
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-xs"
-          data-testid="button-export-data"
-        >
-          <Download className="w-3.5 h-3.5 mr-2" />
-          데이터 내보내기
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-xs"
-          onClick={onSettingsOpen}
-          data-testid="button-open-settings"
-        >
-          <Settings2 className="w-3.5 h-3.5 mr-2" />
-          시스템 설정
-        </Button>
+      <Separator />
+      <SidebarFooter className="p-2 flex flex-row items-center justify-center gap-1">
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                data-testid="button-export-data"
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">데이터 내보내기</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onSettingsOpen}
+                data-testid="button-open-settings"
+              >
+                <Settings2 className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">시스템 설정</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </SidebarFooter>
     </Sidebar>
   );
