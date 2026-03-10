@@ -35,12 +35,12 @@ interface SettingsPopupProps {
 }
 
 const NAV_ITEMS: { id: SettingsSection; label: string; icon: typeof Settings2 }[] = [
-  { id: "general", label: "일반", icon: Settings2 },
-  { id: "layers", label: "레이어", icon: Layers },
-  { id: "basemaps", label: "배경 지도", icon: Globe },
-  { id: "rendering", label: "렌더링", icon: Gauge },
-  { id: "map", label: "지도", icon: Map },
-  { id: "ml-server", label: "ML 연산", icon: Cpu },
+  { id: "general", label: "일반 설정", icon: Settings2 },
+  { id: "layers", label: "레이어 관리", icon: Layers },
+  { id: "basemaps", label: "배경 지도 관리", icon: Globe },
+  { id: "rendering", label: "대용량 렌더링 설정", icon: Gauge },
+  { id: "map", label: "지도 기본 설정", icon: Map },
+  { id: "ml-server", label: "ML 연산 서버 설정", icon: Cpu },
   { id: "products", label: "제품 라인업", icon: Package },
 ];
 
