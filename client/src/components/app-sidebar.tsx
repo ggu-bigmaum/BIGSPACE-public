@@ -220,7 +220,7 @@ export function AppSidebar({
                                   <TooltipProvider delayDuration={300}>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <span data-testid={`badge-layer-type-${layer.id}`}>
+                                        <span data-testid={`badge-layer-type-${layer.id}`} className="scale-[0.7] origin-left inline-flex">
                                           {badgeStyle === "pill" && (
                                             <span className={`inline-flex items-center justify-center h-4 px-1.5 rounded-full ${BADGE_COLOR_SOLID[typeBadge]} text-white text-[9px] font-bold shadow-sm`}>
                                               {BADGE_SHORT[typeBadge]}
