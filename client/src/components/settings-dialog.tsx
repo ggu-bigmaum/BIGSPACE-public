@@ -565,9 +565,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         <span className="text-xs font-medium">클라우드 ML</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground leading-relaxed">
-                        AWS SageMaker, Google Vertex AI, Azure ML 등 관리형 서비스 연동
+                        AWS SageMaker, Google Vertex AI, Azure ML 등 관리형 서비스의 REST API를 호출하여 추론 수행. GPU 인프라를 직접 관리할 필요 없이 사용한 만큼만 과금.
                       </p>
-                      <Badge variant="outline" className="text-[9px]">권장</Badge>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant="outline" className="text-[9px]">권장</Badge>
+                        <Badge variant="outline" className="text-[9px] border-green-500/50 text-green-400">구현 가능</Badge>
+                      </div>
                     </div>
                     <div className="border rounded-lg p-3 space-y-2" data-testid="ml-option-onpremise">
                       <div className="flex items-center gap-2">
@@ -575,9 +578,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         <span className="text-xs font-medium">온프레미스</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground leading-relaxed">
-                        기관 내부 GPU 서버에 직접 연결 (보안망 환경)
+                        기관 내부망 GPU 서버에 직접 연결. 데이터가 외부로 나가지 않아 보안 요건 충족. 별도 ML 서버(Flask/FastAPI) 구축 필요.
                       </p>
-                      <Badge variant="outline" className="text-[9px]">공공기관</Badge>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant="outline" className="text-[9px]">공공기관</Badge>
+                        <Badge variant="outline" className="text-[9px] border-yellow-500/50 text-yellow-400">인프라 필요</Badge>
+                      </div>
                     </div>
                     <div className="border rounded-lg p-3 space-y-2" data-testid="ml-option-lightweight">
                       <div className="flex items-center gap-2">
@@ -585,9 +591,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         <span className="text-xs font-medium">경량 추론</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground leading-relaxed">
-                        ONNX Runtime 기반 CPU 추론 (학습 별도, 추론만 로컬)
+                        ONNX Runtime 또는 TensorFlow.js로 앱 서버에서 직접 CPU 추론. 소형 모델(수십MB 이하)의 간단한 분류/예측에만 적합하며, 영상 처리는 성능 한계 있음.
                       </p>
-                      <Badge variant="outline" className="text-[9px]">소규모</Badge>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant="outline" className="text-[9px]">소규모</Badge>
+                        <Badge variant="outline" className="text-[9px] border-orange-500/50 text-orange-400">제한적</Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -660,45 +669,80 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <Separator />
 
                 <div className="space-y-3">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">지원 분석 기능</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 py-1.5">
-                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
-                      <span className="text-xs">위성영상 객체 탐지 (건물, 도로, 식생 분류)</span>
-                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">지원 분석 기능 (구현 가능성 검토)</h4>
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground font-medium pt-1 pb-0.5">외부 ML 서버 연동 시 구현 가능 (클라우드/온프레미스 GPU 필요)</p>
+                    <div className="flex items-start gap-2 py-1.5 pl-2 border-l-2 border-green-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs">위성영상 객체 탐지 (건물, 도로, 식생 분류)</span>
+                        <p className="text-[10px] text-muted-foreground/70">GPU 필수. YOLO/Mask R-CNN 등 사전학습 모델 활용. REST API로 이미지 전송 → 결과 GeoJSON 반환</p>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] border-green-500/50 text-green-400 flex-shrink-0">API 연동</Badge>
                     </div>
-                    <div className="flex items-center gap-2 py-1.5">
-                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
-                      <span className="text-xs">공간 데이터 패턴 분석 (시설물 노후도 예측)</span>
-                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                    <div className="flex items-start gap-2 py-1.5 pl-2 border-l-2 border-green-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs">변화 탐지 (시계열 위성영상 비교)</span>
+                        <p className="text-[10px] text-muted-foreground/70">GPU 필수. 두 시점 영상을 비교하여 변화 영역 추출. U-Net 등 세그멘테이션 모델 활용</p>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] border-green-500/50 text-green-400 flex-shrink-0">API 연동</Badge>
                     </div>
-                    <div className="flex items-center gap-2 py-1.5">
-                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
-                      <span className="text-xs">DEM 기반 지형 자동 분류</span>
-                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                    <div className="flex items-start gap-2 py-1.5 pl-2 border-l-2 border-green-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs">DEM 기반 지형 자동 분류</span>
+                        <p className="text-[10px] text-muted-foreground/70">GPU 권장. 수치표고모델(DEM) 래스터 데이터를 입력으로 경사/향/지형 클래스 분류</p>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] border-green-500/50 text-green-400 flex-shrink-0">API 연동</Badge>
                     </div>
-                    <div className="flex items-center gap-2 py-1.5">
-                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
-                      <span className="text-xs">이상치 탐지 및 공간 클러스터링 분석</span>
-                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground font-medium pt-2 pb-0.5">앱 서버 자체 구현 가능 (CPU 연산, 경량 모델)</p>
+                    <div className="flex items-start gap-2 py-1.5 pl-2 border-l-2 border-cyan-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs">공간 데이터 패턴 분석 (속성 기반 예측)</span>
+                        <p className="text-[10px] text-muted-foreground/70">CPU 가능. 시설물 속성(연식, 재질 등)으로 노후도 점수 산출. 단순 회귀/분류 모델, ONNX 또는 TF.js</p>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] border-cyan-500/50 text-cyan-400 flex-shrink-0">로컬 추론</Badge>
                     </div>
-                    <div className="flex items-center gap-2 py-1.5">
-                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
-                      <span className="text-xs">변화 탐지 (시계열 위성영상 비교)</span>
-                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                    <div className="flex items-start gap-2 py-1.5 pl-2 border-l-2 border-cyan-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs">이상치 탐지 및 공간 클러스터링</span>
+                        <p className="text-[10px] text-muted-foreground/70">CPU 가능. DBSCAN/K-Means 알고리즘을 JS로 직접 구현 가능. ML 서버 불필요, 순수 수학 연산</p>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] border-cyan-500/50 text-cyan-400 flex-shrink-0">로컬 연산</Badge>
+                    </div>
+                    <div className="flex items-start gap-2 py-1.5 pl-2 border-l-2 border-cyan-500/30">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs">공간 통계 분석 (핫스팟, 밀도 추정)</span>
+                        <p className="text-[10px] text-muted-foreground/70">CPU 가능. 커널 밀도 추정(KDE), Getis-Ord Gi* 등 공간 통계 알고리즘. ML 모델 불필요</p>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] border-cyan-500/50 text-cyan-400 flex-shrink-0">로컬 연산</Badge>
                     </div>
                   </div>
                 </div>
 
                 <Separator />
 
-                <div className="rounded-lg border border-dashed border-muted-foreground/30 p-4 text-center space-y-2" data-testid="ml-status-banner">
-                  <Cpu className="w-8 h-8 text-muted-foreground/40 mx-auto" />
-                  <p className="text-xs text-muted-foreground">
-                    ML 연산 서버 연동 기능은 현재 준비 중입니다.
-                  </p>
-                  <p className="text-[10px] text-muted-foreground/70">
-                    서버 연결, 모델 관리, 분석 결과 시각화 기능이 향후 업데이트에서 제공됩니다.
+                <div className="rounded-lg border border-dashed border-muted-foreground/30 p-4 space-y-3" data-testid="ml-status-banner">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                    <p className="text-xs font-medium">구현 가능성 요약</p>
+                  </div>
+                  <div className="space-y-1.5 text-[10px] text-muted-foreground/80 leading-relaxed">
+                    <p>• <span className="text-cyan-400 font-medium">로컬 연산 3건</span> — 공간 클러스터링, 이상치 탐지, 통계 분석은 별도 ML 서버 없이 앱 서버에서 JavaScript로 즉시 구현 가능</p>
+                    <p>• <span className="text-green-400 font-medium">API 연동 3건</span> — 영상 분석(객체 탐지, 변화 탐지, 지형 분류)은 외부 GPU 서버의 REST API를 호출하는 프록시 구조로 구현 가능</p>
+                    <p>• <span className="text-yellow-400 font-medium">인프라 조건</span> — 영상 처리 기능은 GPU 서버(클라우드 또는 온프레미스)가 전제되어야 하며, 공공기관의 경우 내부망 배치 필요</p>
+                  </div>
+                  <Separator />
+                  <p className="text-[10px] text-muted-foreground/60">
+                    서버 연결 설정 및 분석 결과 시각화 기능은 향후 업데이트에서 활성화됩니다.
                   </p>
                 </div>
               </div>
