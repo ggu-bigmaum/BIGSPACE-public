@@ -153,26 +153,6 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <Label htmlFor="layer-name">레이어 이름</Label>
-              <Input
-                id="layer-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="예: 공공시설물"
-                data-testid="input-layer-name"
-              />
-            </div>
-            <div className="col-span-2">
-              <Label htmlFor="layer-desc">설명</Label>
-              <Input
-                id="layer-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="레이어에 대한 설명 (선택사항)"
-                data-testid="input-layer-description"
-              />
-            </div>
-            <div className="col-span-2">
               <Label>카테고리</Label>
               {existingCategories.length > 0 && !isNewCategory ? (
                 <div className="flex items-center gap-2">
@@ -227,6 +207,26 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
                   )}
                 </div>
               )}
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="layer-name">레이어 이름</Label>
+              <Input
+                id="layer-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 공공시설물"
+                data-testid="input-layer-name"
+              />
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="layer-desc">설명</Label>
+              <Input
+                id="layer-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="레이어에 대한 설명 (선택사항)"
+                data-testid="input-layer-description"
+              />
             </div>
           </div>
 
