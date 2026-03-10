@@ -205,7 +205,7 @@ export function SpatialAnalysisPanel({ layers, onClose }: SpatialAnalysisPanelPr
 
   return (
     <div className="absolute top-3 left-3 z-20 w-80" data-testid="spatial-analysis-panel">
-      <Card className="bg-card/95 backdrop-blur-sm overflow-hidden">
+      <Card className="bg-card/95 backdrop-blur-sm overflow-hidden border border-border/60 shadow-lg shadow-black/10 dark:shadow-black/30">
         <div className="p-3 space-y-3">
           <div className="flex items-center justify-between gap-1">
             <div className="flex items-center gap-2">
