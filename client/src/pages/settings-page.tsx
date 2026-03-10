@@ -676,7 +676,7 @@ function GeneralSection({ theme, setTheme }: { theme: string; setTheme: (t: "lig
             <span className="text-muted-foreground">제품명</span>
             <span>BIGSPACE Public</span>
             <span className="text-muted-foreground">버전</span>
-            <span>v1.0 공공기관</span>
+            <span>v1.3</span>
             <span className="text-muted-foreground">좌표계</span>
             <span>EPSG:4326 (WGS84)</span>
             <span className="text-muted-foreground">데이터베이스</span>
