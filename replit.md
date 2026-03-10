@@ -35,6 +35,8 @@
 - `server/routes.ts` - API 엔드포인트 (레이어 CRUD, 피처, 집계, 공간 쿼리, 배경지도, 설정)
 - `server/storage.ts` - DatabaseStorage (공간 연산 포함)
 - `server/seed.ts` - 시드 데이터 (서울: 공공시설 200개, 도로 30개, 행정구역 5개, 기본 배경지도, 기본 설정)
+- **데이터**: 총 6개 레이어 (인프라/교통/행정 3개 + 응급출동 2020/2021/2022 약 165만 건)
+- **좌표 변환**: EPSG:5181(한국 TM) → EPSG:4326(WGS84), proj4 라이브러리 사용
 - `client/src/App.tsx` - 메인 레이아웃: 사이드바 + 전체 화면 지도 (상단 헤더 없음)
 - `client/src/components/map-viewer.tsx` - OpenLayers 지도 (좌표+주소/지명 검색, 줌 컨트롤, 배경지도 전환, 타일 에러 감지)
 - `client/src/components/app-sidebar.tsx` - 사이드바: 한글 제목, 작업 공간 선택, 레이어 토글/배지, 내보내기/설정 푸터
