@@ -243,7 +243,6 @@ export function AppSidebar({
                                   <span className="text-[9px] text-muted-foreground" data-testid={`text-layer-size-${layer.id}`}>
                                     {sizeLabel}
                                   </span>
-                                  <span className="text-[9px] text-muted-foreground">·</span>
                                   <TooltipProvider delayDuration={300}>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
