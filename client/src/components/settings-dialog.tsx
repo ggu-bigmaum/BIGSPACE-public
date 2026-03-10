@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/select";
 import {
   Map, Globe, Eye, EyeOff, Star, Trash2, Key, Info,
-  Layers, Gauge, Monitor, Plus,
+  Layers, Gauge, Monitor, Plus, Cpu, Server, Cloud,
+  CheckCircle2, Circle, ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -346,11 +347,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <Monitor className="w-5 h-5" />
             설정
           </DialogTitle>
-          <p className="text-xs text-muted-foreground">배경 지도, 렌더링, 지도 뷰어 설정을 관리합니다.</p>
+          <p className="text-xs text-muted-foreground">배경 지도, 렌더링, 지도 뷰어, ML 연산 서버 설정을 관리합니다.</p>
         </DialogHeader>
 
         <Tabs defaultValue="basemaps" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="w-full grid grid-cols-3">
+          <TabsList className="w-full grid grid-cols-4">
             <TabsTrigger value="basemaps" data-testid="tab-basemaps">
               <Globe className="w-3.5 h-3.5 mr-1.5" />
               배경 지도
@@ -362,6 +363,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <TabsTrigger value="map" data-testid="tab-map">
               <Map className="w-3.5 h-3.5 mr-1.5" />
               지도
+            </TabsTrigger>
+            <TabsTrigger value="ml-server" data-testid="tab-ml-server">
+              <Cpu className="w-3.5 h-3.5 mr-1.5" />
+              ML 연산
             </TabsTrigger>
           </TabsList>
 
@@ -534,6 +539,169 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {mapSettings.length === 0 && (
                 <p className="text-sm text-muted-foreground py-4 text-center">설정이 아직 로드되지 않았습니다.</p>
               )}
+            </TabsContent>
+
+            <TabsContent value="ml-server" className="mt-0 space-y-4" data-testid="tab-content-ml-server">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                  <Cpu className="w-4 h-4" />
+                  ML 연산 서버 설정
+                </h3>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                  머신러닝 연산 서버를 연결하여 공간 데이터 기반 AI 분석 기능을 활용합니다.
+                  외부 GPU 서버 또는 클라우드 ML 서비스와 연동할 수 있습니다.
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">연결 방식</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="border rounded-lg p-3 space-y-2 border-primary/50 bg-primary/5" data-testid="ml-option-cloud">
+                      <div className="flex items-center gap-2">
+                        <Cloud className="w-4 h-4 text-primary" />
+                        <span className="text-xs font-medium">클라우드 ML</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        AWS SageMaker, Google Vertex AI, Azure ML 등 관리형 서비스 연동
+                      </p>
+                      <Badge variant="outline" className="text-[9px]">권장</Badge>
+                    </div>
+                    <div className="border rounded-lg p-3 space-y-2" data-testid="ml-option-onpremise">
+                      <div className="flex items-center gap-2">
+                        <Server className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-medium">온프레미스</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        기관 내부 GPU 서버에 직접 연결 (보안망 환경)
+                      </p>
+                      <Badge variant="outline" className="text-[9px]">공공기관</Badge>
+                    </div>
+                    <div className="border rounded-lg p-3 space-y-2" data-testid="ml-option-lightweight">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-medium">경량 추론</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        ONNX Runtime 기반 CPU 추론 (학습 별도, 추론만 로컬)
+                      </p>
+                      <Badge variant="outline" className="text-[9px]">소규모</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">서버 연결 정보</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <Label className="text-[11px]">ML 서버 엔드포인트 URL</Label>
+                      <Input
+                        placeholder="https://ml-server.example.com/api/v1"
+                        className="h-8 text-xs font-mono mt-1"
+                        disabled
+                        data-testid="input-ml-endpoint"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-[11px]">인증 방식</Label>
+                        <Select disabled>
+                          <SelectTrigger className="h-8 text-xs mt-1" data-testid="select-ml-auth-type">
+                            <SelectValue placeholder="선택하세요" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="api-key">API 키</SelectItem>
+                            <SelectItem value="bearer">Bearer 토큰</SelectItem>
+                            <SelectItem value="oauth2">OAuth 2.0</SelectItem>
+                            <SelectItem value="mtls">mTLS 인증서</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-[11px]">API 키 / 토큰</Label>
+                        <Input
+                          type="password"
+                          placeholder="인증 키를 입력하세요"
+                          className="h-8 text-xs mt-1"
+                          disabled
+                          data-testid="input-ml-api-key"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-[11px]">연결 타임아웃 (초)</Label>
+                        <Input
+                          type="number"
+                          placeholder="30"
+                          className="h-8 text-xs mt-1"
+                          disabled
+                          data-testid="input-ml-timeout"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[11px]">최대 재시도 횟수</Label>
+                        <Input
+                          type="number"
+                          placeholder="3"
+                          className="h-8 text-xs mt-1"
+                          disabled
+                          data-testid="input-ml-retries"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">지원 분석 기능</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 py-1.5">
+                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      <span className="text-xs">위성영상 객체 탐지 (건물, 도로, 식생 분류)</span>
+                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 py-1.5">
+                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      <span className="text-xs">공간 데이터 패턴 분석 (시설물 노후도 예측)</span>
+                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 py-1.5">
+                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      <span className="text-xs">DEM 기반 지형 자동 분류</span>
+                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 py-1.5">
+                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      <span className="text-xs">이상치 탐지 및 공간 클러스터링 분석</span>
+                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 py-1.5">
+                      <Circle className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      <span className="text-xs">변화 탐지 (시계열 위성영상 비교)</span>
+                      <Badge variant="secondary" className="text-[9px] ml-auto">개발 예정</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="rounded-lg border border-dashed border-muted-foreground/30 p-4 text-center space-y-2" data-testid="ml-status-banner">
+                  <Cpu className="w-8 h-8 text-muted-foreground/40 mx-auto" />
+                  <p className="text-xs text-muted-foreground">
+                    ML 연산 서버 연동 기능은 현재 준비 중입니다.
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/70">
+                    서버 연결, 모델 관리, 분석 결과 시각화 기능이 향후 업데이트에서 제공됩니다.
+                  </p>
+                </div>
+              </div>
             </TabsContent>
           </div>
         </Tabs>
