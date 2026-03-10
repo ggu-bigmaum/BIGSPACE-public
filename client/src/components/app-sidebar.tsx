@@ -183,12 +183,13 @@ export function AppSidebar({
                   }, {});
                   const categories = Object.keys(grouped);
 
-                  return categories.map((cat) => (
+                  return categories.map((cat, catIndex) => (
                     <div key={cat}>
-                      {categories.length > 1 && (
-                        <>
+                      {categories.length > 1 && catIndex > 0 && (
                         <Separator className="my-1" />
-                        <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1" data-testid={`category-label-${cat}`}>
+                      )}
+                      {categories.length > 1 && (
+                        <div className={`flex items-center gap-1.5 px-2.5 pb-1 ${catIndex === 0 ? "pt-1" : "pt-2"}`} data-testid={`category-label-${cat}`}>
                           {(() => {
                             const iconMap: Record<string, typeof Siren> = {
                               "응급출동": Siren, "행정": Landmark, "교통": Car,
@@ -201,7 +202,6 @@ export function AppSidebar({
                           })()}
                           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{cat}</span>
                         </div>
-                        </>
                       )}
                       {grouped[cat].map((layer) => {
                         const typeBadge = getLayerTypeBadge(layer);
