@@ -40,6 +40,7 @@
 - `client/src/components/app-sidebar.tsx` - 사이드바: 한글 제목, 작업 공간 선택, 레이어 토글/배지, 내보내기/설정 푸터
 - `client/src/components/settings-dialog.tsx` - 설정 다이얼로그 (배경지도, 렌더링, 지도, ML 연산 서버 설정)
 - `client/src/components/add-layer-dialog.tsx` - 레이어 추가 다이얼로그
+- `client/src/components/spatial-analysis-panel.tsx` - 공간 분석 패널 (클러스터링, 이상치, 핫스팟, 통계)
 - `client/src/components/radius-search-panel.tsx` - 반경 검색 도구
 - `client/src/components/feature-info-panel.tsx` - 레이어 정보 패널
 - `client/src/components/theme-provider.tsx` - 다크/라이트 모드 (기본 다크)

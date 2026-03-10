@@ -16,6 +16,7 @@ function MapLayout() {
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [addLayerDialogOpen, setAddLayerDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
 
   const style = {
     "--sidebar-width": "18rem",
@@ -30,11 +31,14 @@ function MapLayout() {
           onLayerSelect={setSelectedLayerId}
           onAddLayer={() => setAddLayerDialogOpen(true)}
           onSettingsOpen={() => setSettingsOpen(true)}
+          onAnalysisOpen={() => setAnalysisOpen(true)}
           selectedLayerId={selectedLayerId}
         />
         <main className="flex-1 min-w-0 overflow-hidden relative">
           <MapPage
             selectedLayerId={selectedLayerId}
+            analysisOpen={analysisOpen}
+            onAnalysisClose={() => setAnalysisOpen(false)}
           />
         </main>
       </div>

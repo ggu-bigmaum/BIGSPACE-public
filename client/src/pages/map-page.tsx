@@ -4,14 +4,19 @@ import type { Layer } from "@shared/schema";
 import { MapViewer } from "@/components/map-viewer";
 import { RadiusSearchPanel } from "@/components/radius-search-panel";
 import { FeatureInfoPanel } from "@/components/feature-info-panel";
+import { SpatialAnalysisPanel } from "@/components/spatial-analysis-panel";
 import { useToast } from "@/hooks/use-toast";
 
 interface MapPageProps {
   selectedLayerId?: string | null;
+  analysisOpen?: boolean;
+  onAnalysisClose?: () => void;
 }
 
 export default function MapPage({
   selectedLayerId = null,
+  analysisOpen = false,
+  onAnalysisClose,
 }: MapPageProps) {
   const activeTool = "select";
   const { toast } = useToast();
@@ -92,6 +97,13 @@ export default function MapPage({
           layer={selectedLayer}
           bbox={currentBbox}
           zoom={currentZoom}
+        />
+      )}
+
+      {analysisOpen && (
+        <SpatialAnalysisPanel
+          layers={layers}
+          onClose={() => onAnalysisClose?.()}
         />
       )}
     </div>

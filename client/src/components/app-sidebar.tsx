@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Layers, Plus, Map, Download, Settings2, Globe, Info,
+  Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,7 @@ interface AppSidebarProps {
   onLayerSelect?: (layerId: string | null) => void;
   onAddLayer?: () => void;
   onSettingsOpen?: () => void;
+  onAnalysisOpen?: () => void;
   selectedLayerId?: string | null;
 }
 
@@ -52,6 +53,7 @@ export function AppSidebar({
   onLayerSelect,
   onAddLayer,
   onSettingsOpen,
+  onAnalysisOpen,
   selectedLayerId,
 }: AppSidebarProps) {
   const { toast } = useToast();
@@ -199,6 +201,16 @@ export function AppSidebar({
             제품 소개
           </Button>
         </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-xs"
+          onClick={onAnalysisOpen}
+          data-testid="button-spatial-analysis"
+        >
+          <Cpu className="w-3.5 h-3.5 mr-2" />
+          공간 분석
+        </Button>
         <Button
           variant="ghost"
           size="sm"
