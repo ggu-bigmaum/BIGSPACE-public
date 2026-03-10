@@ -61,10 +61,10 @@ function BasemapCard({ basemap, onUpdate, onDelete, onSetDefault }: {
   const needsApiKey = basemap.provider !== "osm";
 
   return (
-    <div className={`border rounded-lg p-4 space-y-3 transition-colors ${basemap.enabled ? "" : "opacity-60"}`}
+    <div className="border rounded-lg p-4 space-y-3"
       data-testid={`basemap-card-${basemap.id}`}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${basemap.enabled ? "" : "opacity-50"}`}>
           <Globe className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">{basemap.name}</span>
           <Badge className={`text-[10px] ${providerColors[basemap.provider] || providerColors.custom}`}>
