@@ -38,7 +38,7 @@
 - `client/src/App.tsx` - 메인 레이아웃: 사이드바 + 전체 화면 지도 (상단 헤더 없음)
 - `client/src/components/map-viewer.tsx` - OpenLayers 지도 (좌표+주소/지명 검색, 줌 컨트롤, 배경지도 전환, 타일 에러 감지)
 - `client/src/components/app-sidebar.tsx` - 사이드바: 한글 제목, 작업 공간 선택, 레이어 토글/배지, 내보내기/설정 푸터
-- `client/src/pages/settings-page.tsx` - 설정 팝업 오버레이 (일반/배경지도/렌더링/지도/ML 연산, 좌측 사이드바 네비게이션, 100px 여백)
+- `client/src/pages/settings-page.tsx` - 설정 팝업 오버레이 (일반/레이어/배경지도/렌더링/지도/ML 연산, 좌측 사이드바 네비게이션, 100px 여백)
 - `client/src/components/add-layer-dialog.tsx` - 레이어 추가 다이얼로그
 - `client/src/components/spatial-analysis-panel.tsx` - 공간 분석 패널 (클러스터링, 이상치, 핫스팟, 통계)
 - `client/src/components/radius-search-panel.tsx` - 반경 검색 도구

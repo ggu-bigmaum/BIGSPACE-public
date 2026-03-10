@@ -31,8 +31,28 @@ export async function registerRoutes(
     }
   });
 
+  const layerUpdateSchema = z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().nullable().optional(),
+    visible: z.boolean().optional(),
+    opacity: z.number().min(0).max(1).optional(),
+    strokeColor: z.string().optional(),
+    fillColor: z.string().optional(),
+    strokeWidth: z.number().min(0.5).max(10).optional(),
+    pointRadius: z.number().min(1).max(20).optional(),
+    renderMode: z.enum(["auto", "feature", "tile", "aggregate"]).optional(),
+    featureLimit: z.number().int().min(100).max(50000).optional(),
+    minZoomForFeatures: z.number().int().min(0).max(22).optional(),
+    tileEnabled: z.boolean().optional(),
+    tileMaxZoom: z.number().int().min(0).max(22).optional(),
+  }).strict();
+
   app.patch("/api/layers/:id", async (req, res) => {
-    const layer = await storage.updateLayer(req.params.id, req.body);
+    const parsed = layerUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "잘못된 요청 데이터", errors: parsed.error.flatten() });
+    }
+    const layer = await storage.updateLayer(req.params.id, parsed.data);
     if (!layer) return res.status(404).json({ message: "Layer not found" });
     res.json(layer);
   });
