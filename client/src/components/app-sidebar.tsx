@@ -85,7 +85,7 @@ export function AppSidebar({
   };
 
   const badgeShortLabel: Record<string, string> = {
-    VECTOR: "(V)", RASTER: "(R)", DEM: "(D)", HEATMAP: "(H)",
+    VECTOR: "V", RASTER: "R", DEM: "D", HEATMAP: "H",
   };
 
   const badgeTooltip: Record<string, string> = {
@@ -195,14 +195,11 @@ export function AppSidebar({
                                   <TooltipProvider delayDuration={300}>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <span>
-                                          <Badge
-                                            variant="outline"
-                                            className={`text-[9px] px-1 py-0 h-4 font-semibold tracking-wider border ${badgeClass} no-default-hover-elevate no-default-active-elevate`}
-                                            data-testid={`badge-layer-type-${layer.id}`}
-                                          >
-                                            {badgeShortLabel[typeBadge] || typeBadge}
-                                          </Badge>
+                                        <span
+                                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold border ${badgeClass} no-default-hover-elevate no-default-active-elevate`}
+                                          data-testid={`badge-layer-type-${layer.id}`}
+                                        >
+                                          {badgeShortLabel[typeBadge] || typeBadge}
                                         </span>
                                       </TooltipTrigger>
                                       <TooltipContent side="bottom" className="text-xs">
