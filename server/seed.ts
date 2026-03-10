@@ -171,6 +171,7 @@ export async function seedDatabase() {
   const facilityLayer = await storage.createLayer({
     name: "Public Facilities",
     description: "Public infrastructure and facilities across Seoul metropolitan area",
+    category: "인프라",
     geometryType: "Point",
     srid: 4326,
     renderMode: "auto",
@@ -189,6 +190,7 @@ export async function seedDatabase() {
   const roadLayer = await storage.createLayer({
     name: "Major Roads",
     description: "Major road network and highways",
+    category: "교통",
     geometryType: "LineString",
     srid: 4326,
     renderMode: "auto",
@@ -207,6 +209,7 @@ export async function seedDatabase() {
   const zoneLayer = await storage.createLayer({
     name: "Administrative Zones",
     description: "Administrative district boundaries",
+    category: "행정",
     geometryType: "Polygon",
     srid: 4326,
     renderMode: "auto",

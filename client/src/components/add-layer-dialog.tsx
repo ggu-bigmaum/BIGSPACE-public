@@ -32,6 +32,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("일반");
   const [geometryType, setGeometryType] = useState("Point");
   const [renderMode, setRenderMode] = useState("auto");
   const [featureLimit, setFeatureLimit] = useState("2000");
@@ -77,6 +78,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
   const resetForm = () => {
     setName("");
     setDescription("");
+    setCategory("일반");
     setGeometryType("Point");
     setRenderMode("auto");
     setFeatureLimit("2000");
@@ -95,6 +97,7 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
     createLayerMutation.mutate({
       name: name.trim(),
       description: description.trim() || undefined,
+      category: category.trim() || "일반",
       geometryType,
       renderMode,
       featureLimit: parseInt(featureLimit),
@@ -124,20 +127,30 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
               />
             </div>
             <div className="col-span-2">
-              <Label htmlFor="layer-desc">Description</Label>
+              <Label htmlFor="layer-desc">설명</Label>
               <Input
                 id="layer-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description"
+                placeholder="레이어에 대한 설명 (선택사항)"
                 data-testid="input-layer-description"
+              />
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="layer-category">카테고리</Label>
+              <Input
+                id="layer-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="예: 인프라, 교통, 행정, 환경"
+                data-testid="input-layer-category"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Geometry Type</Label>
+              <Label>기하 타입</Label>
               <Select value={geometryType} onValueChange={setGeometryType}>
                 <SelectTrigger data-testid="select-geometry-type">
                   <SelectValue />

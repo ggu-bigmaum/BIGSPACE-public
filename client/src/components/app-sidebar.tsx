@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu,
+  Layers, Plus, Map, Download, Settings2, Globe, Info, Cpu, FolderOpen,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -121,60 +121,80 @@ export function AppSidebar({
                   </SidebarMenuItem>
                 ))
               ) : layersData && layersData.length > 0 ? (
-                layersData.map((layer) => {
-                  const typeBadge = getLayerTypeBadge(layer);
-                  const sizeLabel = getLayerSizeLabel(layer);
-                  const isSelected = selectedLayerId === layer.id;
-                  const badgeClass = badgeColorMap[typeBadge] || badgeColorMap.VECTOR;
+                (() => {
+                  const grouped = layersData.reduce<Record<string, Layer[]>>((acc, layer) => {
+                    const cat = layer.category || "일반";
+                    if (!acc[cat]) acc[cat] = [];
+                    acc[cat].push(layer);
+                    return acc;
+                  }, {});
+                  const categories = Object.keys(grouped);
 
-                  return (
-                    <SidebarMenuItem key={layer.id}>
-                      <div
-                        className={`flex items-start gap-2.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors ${isSelected ? "bg-accent" : "hover-elevate"}`}
-                        onClick={() => onLayerSelect?.(isSelected ? null : layer.id)}
-                        data-testid={`button-select-layer-${layer.id}`}
-                      >
-                        <Switch
-                          checked={layer.visible}
-                          onCheckedChange={(checked) => {
-                            updateMutation.mutate({ id: layer.id, updates: { visible: checked } });
-                            onLayerToggle?.(layer.id, checked);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="mt-0.5 data-[state=checked]:bg-primary"
-                          data-testid={`switch-toggle-visibility-${layer.id}`}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <div
-                              className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                              style={{ backgroundColor: layer.fillColor, border: `1px solid ${layer.strokeColor}` }}
-                            />
-                            <span
-                              className={`text-xs font-medium truncate ${!layer.visible ? "text-muted-foreground" : ""}`}
-                              data-testid={`text-layer-name-${layer.id}`}
-                            >
-                              {layer.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <Badge
-                              variant="outline"
-                              className={`text-[9px] px-1.5 py-0 h-4 font-semibold tracking-wider border ${badgeClass} no-default-hover-elevate no-default-active-elevate`}
-                              data-testid={`badge-layer-type-${layer.id}`}
-                            >
-                              {typeBadge}
-                            </Badge>
-                            <span className="text-[9px] text-muted-foreground">·</span>
-                            <span className="text-[9px] text-muted-foreground" data-testid={`text-layer-size-${layer.id}`}>
-                              {sizeLabel}
-                            </span>
-                          </div>
+                  return categories.map((cat) => (
+                    <div key={cat}>
+                      {categories.length > 1 && (
+                        <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1" data-testid={`category-label-${cat}`}>
+                          <FolderOpen className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{cat}</span>
                         </div>
-                      </div>
-                    </SidebarMenuItem>
-                  );
-                })
+                      )}
+                      {grouped[cat].map((layer) => {
+                        const typeBadge = getLayerTypeBadge(layer);
+                        const sizeLabel = getLayerSizeLabel(layer);
+                        const isSelected = selectedLayerId === layer.id;
+                        const badgeClass = badgeColorMap[typeBadge] || badgeColorMap.VECTOR;
+
+                        return (
+                          <SidebarMenuItem key={layer.id}>
+                            <div
+                              className={`flex items-start gap-2.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors ${isSelected ? "bg-accent" : "hover-elevate"}`}
+                              onClick={() => onLayerSelect?.(isSelected ? null : layer.id)}
+                              data-testid={`button-select-layer-${layer.id}`}
+                            >
+                              <Switch
+                                checked={layer.visible}
+                                onCheckedChange={(checked) => {
+                                  updateMutation.mutate({ id: layer.id, updates: { visible: checked } });
+                                  onLayerToggle?.(layer.id, checked);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="mt-0.5 data-[state=checked]:bg-primary"
+                                data-testid={`switch-toggle-visibility-${layer.id}`}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <div
+                                    className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                                    style={{ backgroundColor: layer.fillColor, border: `1px solid ${layer.strokeColor}` }}
+                                  />
+                                  <span
+                                    className={`text-xs font-medium truncate ${!layer.visible ? "text-muted-foreground" : ""}`}
+                                    data-testid={`text-layer-name-${layer.id}`}
+                                  >
+                                    {layer.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[9px] px-1.5 py-0 h-4 font-semibold tracking-wider border ${badgeClass} no-default-hover-elevate no-default-active-elevate`}
+                                    data-testid={`badge-layer-type-${layer.id}`}
+                                  >
+                                    {typeBadge}
+                                  </Badge>
+                                  <span className="text-[9px] text-muted-foreground">·</span>
+                                  <span className="text-[9px] text-muted-foreground" data-testid={`text-layer-size-${layer.id}`}>
+                                    {sizeLabel}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </div>
+                  ));
+                })()
               ) : (
                 <SidebarMenuItem>
                   <div className="px-3 py-4 text-center">

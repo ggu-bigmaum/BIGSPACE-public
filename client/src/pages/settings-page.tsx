@@ -849,6 +849,17 @@ function LayerCard({ layer, onUpdate, onDelete }: {
 
       <div className="grid grid-cols-2 gap-x-6 gap-y-3">
         <div className="space-y-1">
+          <Label className="text-[11px] text-muted-foreground">카테고리</Label>
+          <Input
+            value={merged.category ?? layer.category}
+            onChange={(e) => debouncedUpdate("category", e.target.value || "일반")}
+            className="h-8 text-xs"
+            placeholder="카테고리 입력"
+            data-testid={`input-category-${layer.id}`}
+          />
+        </div>
+
+        <div className="space-y-1">
           <Label className="text-[11px] text-muted-foreground">렌더링 모드</Label>
           <Select
             value={merged.renderMode}
@@ -1017,6 +1028,14 @@ function LayersSection({ layers, onUpdate, onDelete }: {
   onUpdate: (id: string, updates: Partial<Layer>) => void;
   onDelete: (id: string) => void;
 }) {
+  const grouped = layers.reduce<Record<string, Layer[]>>((acc, layer) => {
+    const cat = layer.category || "일반";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(layer);
+    return acc;
+  }, {});
+  const categories = Object.keys(grouped);
+
   return (
     <div className="space-y-6" data-testid="section-layers">
       <div>
@@ -1025,7 +1044,7 @@ function LayersSection({ layers, onUpdate, onDelete }: {
           레이어 관리
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          등록된 레이어의 스타일, 렌더링 설정을 관리합니다. 총 {layers.length}개 레이어가 등록되어 있습니다.
+          등록된 레이어의 스타일, 렌더링 설정을 관리합니다. 총 {layers.length}개 레이어, {categories.length}개 카테고리.
         </p>
       </div>
 
@@ -1038,14 +1057,26 @@ function LayersSection({ layers, onUpdate, onDelete }: {
           <p className="text-xs mt-1">사이드바에서 새 레이어를 추가할 수 있습니다.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {layers.map((layer) => (
-            <LayerCard
-              key={layer.id}
-              layer={layer}
-              onUpdate={onUpdate}
-              onDelete={onDelete}
-            />
+        <div className="space-y-6">
+          {categories.map((cat) => (
+            <div key={cat} className="space-y-3" data-testid={`layer-category-${cat}`}>
+              {categories.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs" data-testid={`badge-category-${cat}`}>
+                    {cat}
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground">{grouped[cat].length}개 레이어</span>
+                </div>
+              )}
+              {grouped[cat].map((layer) => (
+                <LayerCard
+                  key={layer.id}
+                  layer={layer}
+                  onUpdate={onUpdate}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}

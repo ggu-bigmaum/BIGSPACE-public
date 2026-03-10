@@ -34,6 +34,7 @@ export async function registerRoutes(
   const layerUpdateSchema = z.object({
     name: z.string().min(1).optional(),
     description: z.string().nullable().optional(),
+    category: z.string().transform(v => v.trim() || "일반").optional(),
     visible: z.boolean().optional(),
     opacity: z.number().min(0).max(1).optional(),
     strokeColor: z.string().optional(),

@@ -22,6 +22,7 @@ export const layers = pgTable("layers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
+  category: text("category").notNull().default("일반"),
   geometryType: text("geometry_type").notNull().default("Point"),
   srid: integer("srid").notNull().default(4326),
   renderMode: text("render_mode").notNull().default("auto"),
