@@ -6,7 +6,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AddLayerDialog } from "@/components/add-layer-dialog";
-import { SettingsDialog } from "@/components/settings-dialog";
+import SettingsPopup from "@/pages/settings-page";
 import MapPage from "@/pages/map-page";
 import ProductInfoPage from "@/pages/product-info";
 import { useState } from "react";
@@ -43,7 +43,7 @@ function MapLayout() {
         </main>
       </div>
       <AddLayerDialog open={addLayerDialogOpen} onOpenChange={setAddLayerDialogOpen} />
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsPopup open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </SidebarProvider>
   );
 }

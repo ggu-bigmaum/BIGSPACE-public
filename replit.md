@@ -38,15 +38,15 @@
 - `client/src/App.tsx` - 메인 레이아웃: 사이드바 + 전체 화면 지도 (상단 헤더 없음)
 - `client/src/components/map-viewer.tsx` - OpenLayers 지도 (검색 오버레이, 줌 컨트롤, 배경지도 전환, 타일 에러 감지)
 - `client/src/components/app-sidebar.tsx` - 사이드바: 한글 제목, 작업 공간 선택, 레이어 토글/배지, 내보내기/설정 푸터
-- `client/src/components/settings-dialog.tsx` - 설정 다이얼로그 (배경지도, 렌더링, 지도, ML 연산 서버 설정)
+- `client/src/pages/settings-page.tsx` - 설정 팝업 오버레이 (일반/배경지도/렌더링/지도/ML 연산, 좌측 사이드바 네비게이션, 100px 여백)
 - `client/src/components/add-layer-dialog.tsx` - 레이어 추가 다이얼로그
 - `client/src/components/spatial-analysis-panel.tsx` - 공간 분석 패널 (클러스터링, 이상치, 핫스팟, 통계)
 - `client/src/components/radius-search-panel.tsx` - 반경 검색 도구
 - `client/src/components/feature-info-panel.tsx` - 레이어 정보 패널
-- `client/src/components/theme-provider.tsx` - 다크/라이트 모드 (기본 다크)
+- `client/src/components/theme-provider.tsx` - 라이트/다크 모드 (기본 라이트)
 
 ## UI 디자인
-- **테마**: 다크 네이비 (#0e1117) 배경, 시안/틸 (#00c8dc) 주 액센트
+- **테마**: 라이트/다크 전환 가능 (기본 라이트), 시안/틸 (#00c8dc) 주 액센트, 설정 페이지에서 테마 선택
 - **사이드바**: "GIS 업무 솔루션" 제목, 활성 작업 공간 선택, Switch 토글 + 타입 배지 레이어 목록
 - **지도**: ESRI 위성 배경지도 기본, 상단 좌표 검색, 우측 줌 +/- 버튼
 - **헤더 없음**: 사이드바 옆 지도가 전체 높이 차지
