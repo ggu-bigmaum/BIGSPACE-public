@@ -57,12 +57,7 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
   }
 
   if (basemap.provider === "naver") {
-    const naverSource = new XYZ({
-      url: "/api/proxy/naver-tiles/{z}/{x}/{y}",
-      maxZoom: basemap.maxZoom || 21,
-      attributions: basemap.attribution || "© Naver Corp.",
-    });
-    return { source: naverSource, error: null };
+    return { source: new OSM(), error: "네이버 지도: NCP 인증 설정이 필요합니다. NCP 콘솔에서 Client ID와 Web 서비스 URL을 확인하세요." };
   }
 
   let url = basemap.urlTemplate;

@@ -213,29 +213,8 @@ export async function registerRoutes(
   });
 
   // Basemap CRUD
-  app.get("/api/proxy/naver-tiles/:z/:x/:y", async (req, res) => {
-    const { z, x, y } = req.params;
-    if (!NCP_CLIENT_ID || !NCP_CLIENT_SECRET) {
-      return res.status(500).json({ message: "네이버 지도 API 키가 설정되지 않았습니다" });
-    }
-    try {
-      const tileUrl = `https://naveropenapi.apigw.ntruss.com/map-static/v2/raster-tiles/${z}/${x}/${y}?crs=EPSG:3857&scale=2&format=png`;
-      const response = await fetch(tileUrl, {
-        headers: {
-          "X-NCP-APIGW-API-KEY-ID": NCP_CLIENT_ID,
-          "X-NCP-APIGW-API-KEY": NCP_CLIENT_SECRET,
-        },
-      });
-      if (!response.ok) {
-        return res.status(response.status).json({ message: "네이버 타일 요청 실패" });
-      }
-      const buffer = await response.arrayBuffer();
-      res.set("Content-Type", response.headers.get("content-type") || "image/png");
-      res.set("Cache-Control", "public, max-age=86400");
-      res.send(Buffer.from(buffer));
-    } catch (e) {
-      res.status(500).json({ message: "네이버 타일 프록시 오류" });
-    }
+  app.get("/api/proxy/naver-tiles/:z/:x/:y", async (_req, res) => {
+    res.status(503).json({ message: "네이버 지도는 JavaScript SDK 인증이 필요합니다. NCP 콘솔에서 Web 서비스 URL 설정을 확인하세요." });
   });
 
   app.get("/api/basemaps", async (_req, res) => {

@@ -54,7 +54,7 @@
 - **사이드바**: "GIS 업무 솔루션" 제목, 활성 작업 공간 선택, Switch 토글 + 타입 배지 레이어 목록
 - **지도**: ESRI 위성 배경지도 기본, 상단 좌표 검색, 우측 줌 +/- 버튼
 - **헤더 없음**: 사이드바 옆 지도가 전체 높이 차지
-- **배경지도**: ESRI 위성 (기본, API 키 불필요), OSM, VWorld (API 키 필요), Naver/Kakao (SDK 필요)
+- **배경지도**: OSM (기본), ESRI 위성 (API 키 불필요), VWorld (API 키 필요), 네이버 (NCP SDK 인증 필요 - 현재 미설정), Kakao (SDK 필요)
 
 ## API 엔드포인트
 - `GET /api/layers` - 레이어 목록
