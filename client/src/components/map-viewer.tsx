@@ -57,7 +57,12 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
   }
 
   if (basemap.provider === "naver") {
-    return { source: new XYZ({ url: "" }), error: null };
+    const naverSource = new XYZ({
+      url: "/api/proxy/naver-tiles/{z}/{x}/{y}",
+      maxZoom: basemap.maxZoom || 21,
+      attributions: basemap.attribution || "© Naver Corp.",
+    });
+    return { source: naverSource, error: null };
   }
 
   let url = basemap.urlTemplate;
@@ -216,8 +221,6 @@ export function MapViewer({
   searchResults: externalSearchResults,
 }: MapViewerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const naverMapDivRef = useRef<HTMLDivElement>(null);
-  const naverMapInstanceRef = useRef<any>(null);
   const mapInstance = useRef<OlMap | null>(null);
   const baseTileLayerRef = useRef<TileLayer | null>(null);
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
@@ -471,11 +474,6 @@ export function MapViewer({
 
   useEffect(() => {
     if (!baseTileLayerRef.current || !activeBasemap) return;
-    if (activeBasemap.provider === "naver") {
-      setBasemapError(null);
-      tileErrorCountRef.current = 0;
-      return;
-    }
     const { source, error } = createTileSource(activeBasemap);
     setBasemapError(error);
     tileErrorCountRef.current = 0;
@@ -507,94 +505,6 @@ export function MapViewer({
     baseTileLayerRef.current.setSource(source);
   }, [activeBasemap]);
 
-  useEffect(() => {
-    const map = mapInstance.current;
-    if (!map) return;
-    const isNaver = activeBasemap?.provider === "naver";
-
-    if (isNaver) {
-      const naverMaps = (window as any).naver?.maps;
-      if (!naverMaps || !naverMapDivRef.current) {
-        setBasemapError("네이버 지도 SDK가 로드되지 않았습니다.");
-        return;
-      }
-
-      if (baseTileLayerRef.current) {
-        baseTileLayerRef.current.setVisible(false);
-      }
-      naverMapDivRef.current.style.display = "block";
-      const viewport = map.getViewport();
-      viewport.style.background = "transparent";
-      const canvas = viewport.querySelector("canvas");
-      if (canvas) canvas.style.background = "transparent";
-
-      if (!naverMapInstanceRef.current) {
-        const view = map.getView();
-        const center = toLonLat(view.getCenter()!);
-        const zoom = view.getZoom() || 11;
-
-        try {
-          naverMapInstanceRef.current = new naverMaps.Map(naverMapDivRef.current, {
-            center: new naverMaps.LatLng(center[1], center[0]),
-            zoom: zoom,
-            mapTypeId: naverMaps.MapTypeId.NORMAL,
-            zoomControl: false,
-            mapDataControl: false,
-            scaleControl: false,
-            logoControl: true,
-            logoControlOptions: { position: naverMaps.Position.BOTTOM_LEFT },
-            draggable: false,
-            scrollWheel: false,
-            pinchZoom: false,
-            disableDoubleClickZoom: true,
-            disableDoubleTapZoom: true,
-            disableTwoFingerTapZoom: true,
-            keyboardShortcuts: false,
-            tileTransition: false,
-          });
-        } catch (e) {
-          console.warn("네이버 지도 초기화 실패:", e);
-          setBasemapError("네이버 지도 인증에 실패했습니다. NCP 콘솔에서 Client ID와 서비스 URL을 확인하세요.");
-          return;
-        }
-      }
-
-      const syncNaverView = () => {
-        const nMap = naverMapInstanceRef.current;
-        if (!nMap) return;
-        const naverMapsLocal = (window as any).naver?.maps;
-        if (!naverMapsLocal) return;
-        try {
-          const view = map.getView();
-          const center = toLonLat(view.getCenter()!);
-          const zoom = Math.round(view.getZoom() || 11);
-          nMap.setCenter(new naverMapsLocal.LatLng(center[1], center[0]));
-          nMap.setZoom(zoom);
-        } catch (_) {}
-      };
-
-      syncNaverView();
-      const view = map.getView();
-      view.on("change:center", syncNaverView);
-      view.on("change:resolution", syncNaverView);
-
-      return () => {
-        view.un("change:center", syncNaverView);
-        view.un("change:resolution", syncNaverView);
-      };
-    } else {
-      if (naverMapDivRef.current) {
-        naverMapDivRef.current.style.display = "none";
-      }
-      if (baseTileLayerRef.current) {
-        baseTileLayerRef.current.setVisible(true);
-      }
-      const viewport = map.getViewport();
-      viewport.style.background = "";
-      const canvas = viewport.querySelector("canvas");
-      if (canvas) canvas.style.background = "";
-    }
-  }, [activeBasemap]);
 
   const getZoomTier = useCallback((layer: Layer, zoom: number): "sido" | "sigungu" | "eupmyeondong" | "cluster" | "feature" => {
     if (layer.renderMode === "feature") return "feature";
@@ -959,7 +869,6 @@ export function MapViewer({
 
   return (
     <div className="relative w-full h-full">
-      <div ref={naverMapDivRef} className="absolute inset-0 z-0" style={{ display: "none" }} data-testid="naver-map-container" />
       <div ref={mapRef} className="absolute inset-0 z-[1]" data-testid="map-container" />
 
       {basemapError && (
