@@ -100,6 +100,28 @@ function getHighlightStyle() {
   });
 }
 
+function getRegionStyle(count: number, layer: Layer) {
+  const size = 20 + Math.log2(Math.max(count, 1)) * 5;
+  const baseColor = layer.strokeColor || "#0d9488";
+  const r = parseInt(baseColor.slice(1, 3), 16);
+  const g = parseInt(baseColor.slice(3, 5), 16);
+  const b = parseInt(baseColor.slice(5, 7), 16);
+
+  return new Style({
+    image: new CircleStyle({
+      radius: Math.min(size, 50),
+      fill: new Fill({ color: `rgba(${r}, ${g}, ${b}, 0.35)` }),
+      stroke: new Stroke({ color: `rgba(${r}, ${g}, ${b}, 0.9)`, width: 2.5 }),
+    }),
+    text: new TextStyle({
+      text: count > 9999 ? `${(count / 1000).toFixed(0)}k` : count > 999 ? `${(count / 1000).toFixed(1)}k` : count.toString(),
+      fill: new Fill({ color: "#ffffff" }),
+      stroke: new Stroke({ color: `rgba(${r}, ${g}, ${b}, 0.8)`, width: 3 }),
+      font: `bold ${Math.max(13, Math.min(size * 0.45, 18))}px sans-serif`,
+    }),
+  });
+}
+
 function getClusterStyle(count: number) {
   const size = count <= 20
     ? 6 + Math.sqrt(count) * 4
@@ -348,11 +370,19 @@ export function MapViewer({
     baseTileLayerRef.current.setSource(source);
   }, [activeBasemap]);
 
-  const shouldUseAggregate = useCallback((layer: Layer, zoom: number): boolean => {
-    if (layer.renderMode === "aggregate") return true;
-    if (layer.renderMode === "feature") return false;
-    if (layer.renderMode === "tile") return zoom < layer.minZoomForFeatures;
-    return zoom < layer.minZoomForFeatures && layer.featureCount > 100;
+  const getZoomTier = useCallback((layer: Layer, zoom: number): "region" | "cluster" | "feature" => {
+    if (layer.renderMode === "feature") return "feature";
+    if (layer.renderMode === "aggregate") return "cluster";
+    if (layer.renderMode === "tile") return zoom < layer.minZoomForFeatures ? "cluster" : "feature";
+
+    if (layer.geometryType === "Point" && layer.featureCount > 100) {
+      if (zoom < layer.minZoomForClusters) return "region";
+      if (zoom < layer.minZoomForFeatures) return "cluster";
+      return "feature";
+    }
+
+    if (layer.featureCount > 100 && zoom < layer.minZoomForFeatures) return "cluster";
+    return "feature";
   }, []);
 
   const fetchAndRenderLayer = useCallback(async (layer: Layer) => {
@@ -378,9 +408,38 @@ export function MapViewer({
     const tr = toLonLat([extent[2], extent[3]]);
     const bbox = `${bl[0]},${bl[1]},${tr[0]},${tr[1]}`;
     const zoom = view.getZoom() || 11;
+    const tier = getZoomTier(layer, zoom);
 
     try {
-      if (shouldUseAggregate(layer, zoom)) {
+      if (tier === "region") {
+        const res = await fetch(`/api/layers/${layer.id}/aggregate?bbox=${bbox}&gridSize=5`);
+        if (layerRequestVersionRef.current.get(layer.id) !== version) return;
+        const gridData = await res.json();
+
+        const source = new VectorSource();
+        gridData.forEach((cell: { lng: number; lat: number; count: number }) => {
+          const feature = new OlFeature({
+            geometry: new Point(fromLonLat([cell.lng, cell.lat])),
+            count: cell.count,
+            name: `${cell.count} features`,
+          });
+          feature.setStyle(getRegionStyle(cell.count, layer));
+          source.addFeature(feature);
+        });
+
+        if (layerRequestVersionRef.current.get(layer.id) !== version) return;
+
+        if (existingLayer) {
+          existingLayer.setSource(source);
+          existingLayer.setVisible(true);
+          existingLayer.setOpacity(layer.opacity);
+        } else {
+          const vl = new VectorLayer({ source, zIndex: 10 });
+          vl.setOpacity(layer.opacity);
+          map.addLayer(vl);
+          vectorLayersRef.current.set(layer.id, vl);
+        }
+      } else if (tier === "cluster") {
         const res = await fetch(`/api/layers/${layer.id}/aggregate?bbox=${bbox}&gridSize=20`);
         if (layerRequestVersionRef.current.get(layer.id) !== version) return;
         const gridData = await res.json();
@@ -438,7 +497,7 @@ export function MapViewer({
     } catch (err) {
       console.error("Failed to load layer:", layer.name, err);
     }
-  }, [shouldUseAggregate]);
+  }, [getZoomTier]);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

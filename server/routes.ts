@@ -44,6 +44,7 @@ export async function registerRoutes(
     renderMode: z.enum(["auto", "feature", "tile", "aggregate"]).optional(),
     featureLimit: z.number().int().min(100).max(50000).optional(),
     minZoomForFeatures: z.number().int().min(0).max(22).optional(),
+    minZoomForClusters: z.number().int().min(0).max(22).optional(),
     tileEnabled: z.boolean().optional(),
     tileMaxZoom: z.number().int().min(0).max(22).optional(),
   }).strict();

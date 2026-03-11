@@ -1127,6 +1127,22 @@ function LayerCard({ layer, onUpdate, onDelete }: {
             data-testid={`input-min-zoom-${layer.id}`}
           />
         </div>
+
+        {layer.geometryType === "Point" && (
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">대단위 집계 최소 줌</Label>
+            <Input
+              type="number"
+              min="0"
+              max="22"
+              step="1"
+              value={merged.minZoomForClusters}
+              onChange={(e) => debouncedUpdate("minZoomForClusters", safeInt(e.target.value, layer.minZoomForClusters))}
+              className="h-8 text-xs"
+              data-testid={`input-min-zoom-clusters-${layer.id}`}
+            />
+          </div>
+        )}
       </div>
 
       <Separator />

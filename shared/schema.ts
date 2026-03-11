@@ -28,6 +28,7 @@ export const layers = pgTable("layers", {
   renderMode: text("render_mode").notNull().default("auto"),
   featureLimit: integer("feature_limit").notNull().default(2000),
   minZoomForFeatures: integer("min_zoom_for_features").notNull().default(15),
+  minZoomForClusters: integer("min_zoom_for_clusters").notNull().default(7),
   tileEnabled: boolean("tile_enabled").notNull().default(true),
   tileMaxZoom: integer("tile_max_zoom").notNull().default(14),
   visible: boolean("visible").notNull().default(true),
