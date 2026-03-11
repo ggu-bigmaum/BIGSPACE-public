@@ -46,5 +46,5 @@ integrations = ["javascript_database:1.0.0"]
 [userenv]
 
 [userenv.shared]
-NCP_CLIENT_ID = "uo1rfaxp6a"
-NCP_CLIENT_SECRET = "tLvgSGSgFIXmKfgUt13PJFqMC84WSl6JGd5HmVFT"
+NCP_CLIENT_ID = "ovj25o24ca"
+NCP_CLIENT_SECRET = "NhVcVwCwXjqECQjef9jv12OIoxBIGnHPgPI5xNkz"
