@@ -148,6 +148,17 @@ export async function registerRoutes(
     res.json(grid);
   });
 
+  app.get("/api/layers/:id/boundary-aggregate", async (req, res) => {
+    const { bbox, level } = req.query;
+    if (!bbox || typeof bbox !== "string" || !level) {
+      return res.status(400).json({ message: "bbox and level required" });
+    }
+    const parsedBbox = (bbox as string).split(",").map(Number);
+    if (parsedBbox.length !== 4) return res.status(400).json({ message: "Invalid bbox" });
+    const data = await storage.getBoundaryAggregation(req.params.id, level as string, parsedBbox);
+    res.json(data);
+  });
+
   // Spatial query: radius search
   app.get("/api/spatial/radius", async (req, res) => {
     const { lng, lat, radius, layerIds } = req.query;

@@ -296,28 +296,3 @@
     inset: -1px;
   }
 }
-
-.ol-scale-line {
-  position: absolute !important;
-  bottom: 12px !important;
-  left: auto !important;
-  right: 12px !important;
-  top: auto !important;
-  background: rgba(0, 0, 0, 0.7) !important;
-  backdrop-filter: blur(8px);
-  border-radius: 6px !important;
-  padding: 4px 10px !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  z-index: 20 !important;
-  display: block !important;
-}
-.ol-scale-line-inner {
-  color: rgba(255, 255, 255, 0.9) !important;
-  font-size: 11px !important;
-  font-family: ui-monospace, monospace !important;
-  border: 2px solid rgba(0, 200, 220, 0.7) !important;
-  border-top: none !important;
-  text-align: center;
-  padding: 2px 6px 1px !important;
-  min-width: 80px;
-}

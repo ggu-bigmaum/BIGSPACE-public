@@ -52,6 +52,7 @@ export interface IStorage {
   createAdminBoundaries(boundaries: InsertAdminBoundary[]): Promise<AdminBoundary[]>;
   deleteAdminBoundariesByLevel(level: string): Promise<number>;
   getAdminBoundaryLevels(): Promise<{ level: string; count: number }[]>;
+  getBoundaryAggregation(layerId: string, level: string, bbox: number[]): Promise<{ boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number; geometry: any }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -355,6 +356,49 @@ export class DatabaseStorage implements IStorage {
       ORDER BY level
     `);
     return (result.rows as any[]).map(r => ({ level: r.level, count: r.count }));
+  }
+
+  async getBoundaryAggregation(layerId: string, level: string, bbox: number[]): Promise<{ boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number; geometry: any }[]> {
+    const [minLng, minLat, maxLng, maxLat] = bbox;
+    const result = await db.execute(sql`
+      SELECT
+        ab.id as boundary_id,
+        ab.name,
+        ab.code,
+        ab.center_lng,
+        ab.center_lat,
+        ab.geometry,
+        COALESCE(fc.cnt, 0)::int as count
+      FROM administrative_boundaries ab
+      LEFT JOIN (
+        SELECT
+          ab2.id as bid,
+          count(*)::int as cnt
+        FROM features f
+        JOIN administrative_boundaries ab2 ON ab2.level = ${level}
+          AND f.lat BETWEEN ab2.min_lat AND ab2.max_lat
+          AND f.lng BETWEEN ab2.min_lng AND ab2.max_lng
+        WHERE f.layer_id = ${layerId}
+          AND f.lat BETWEEN ${minLat} AND ${maxLat}
+          AND f.lng BETWEEN ${minLng} AND ${maxLng}
+        GROUP BY ab2.id
+      ) fc ON fc.bid = ab.id
+      WHERE ab.level = ${level}
+        AND ab.max_lng >= ${minLng}
+        AND ab.min_lng <= ${maxLng}
+        AND ab.max_lat >= ${minLat}
+        AND ab.min_lat <= ${maxLat}
+      ORDER BY count DESC
+    `);
+    return (result.rows as any[]).map(r => ({
+      boundaryId: r.boundary_id,
+      name: r.name,
+      code: r.code,
+      count: r.count,
+      centerLng: r.center_lng,
+      centerLat: r.center_lat,
+      geometry: r.geometry,
+    }));
   }
 
   private async updateLayerStats(layerId: string): Promise<void> {

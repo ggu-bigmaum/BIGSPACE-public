@@ -11,9 +11,9 @@ import GeoJSON from "ol/format/GeoJSON";
 import { fromLonLat, toLonLat, transformExtent } from "ol/proj";
 import { Style, Fill, Stroke, Circle as CircleStyle, Text as TextStyle } from "ol/style";
 import { Feature as OlFeature } from "ol";
-import { Point, Circle as CircleGeom } from "ol/geom";
+import { Point, Circle as CircleGeom, MultiPolygon, Polygon } from "ol/geom";
 import Overlay from "ol/Overlay";
-import { defaults as defaultControls, ScaleLine } from "ol/control";
+import { defaults as defaultControls } from "ol/control";
 import type { Layer, Feature, Basemap } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -140,6 +140,37 @@ function getClusterStyle(count: number) {
   });
 }
 
+function getBoundaryStyle(count: number, name: string, layer: Layer, level: string) {
+  const baseColor = layer.strokeColor || "#0d9488";
+  const r = parseInt(baseColor.slice(1, 3), 16);
+  const g = parseInt(baseColor.slice(3, 5), 16);
+  const b = parseInt(baseColor.slice(5, 7), 16);
+  const isSido = level === "시도";
+  const alpha = count > 0 ? Math.min(0.15 + (Math.log10(Math.max(count, 1)) / 6) * 0.4, 0.55) : 0.03;
+  const countText = count > 99999 ? `${(count / 1000).toFixed(0)}k` : count > 9999 ? `${(count / 1000).toFixed(1)}k` : count > 999 ? `${(count / 1000).toFixed(1)}k` : count.toString();
+  const label = isSido ? `${name}\n${countText}` : `${name}\n${countText}`;
+
+  return [
+    new Style({
+      fill: new Fill({ color: `rgba(${r}, ${g}, ${b}, ${alpha})` }),
+      stroke: new Stroke({
+        color: `rgba(${r}, ${g}, ${b}, 0.8)`,
+        width: isSido ? 2 : 1.5,
+      }),
+    }),
+    new Style({
+      text: new TextStyle({
+        text: count > 0 ? label : "",
+        fill: new Fill({ color: "#ffffff" }),
+        stroke: new Stroke({ color: `rgba(0, 0, 0, 0.7)`, width: 3 }),
+        font: `bold ${isSido ? 14 : 12}px sans-serif`,
+        overflow: true,
+        textAlign: "center",
+      }),
+    }),
+  ];
+}
+
 function getApproxScale(zoom: number): string {
   const scaleMap: Record<number, string> = {
     2: "150,000,000",
@@ -234,13 +265,7 @@ export function MapViewer({
         maxZoom: 20,
         minZoom: 2,
       }),
-      controls: defaultControls({ zoom: false, rotate: false, attribution: false }).extend([
-        new ScaleLine({
-          units: 'metric',
-          bar: false,
-          minWidth: 100,
-        }),
-      ]),
+      controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
     });
 
     const highlightSource = new VectorSource();
@@ -401,14 +426,13 @@ export function MapViewer({
     baseTileLayerRef.current.setSource(source);
   }, [activeBasemap]);
 
-  const getZoomTier = useCallback((layer: Layer, zoom: number): "region" | "cluster" | "feature" => {
+  const getZoomTier = useCallback((layer: Layer, zoom: number): "sido" | "sigungu" | "cluster" | "feature" => {
     if (layer.renderMode === "feature") return "feature";
-    if (layer.renderMode === "aggregate") return "cluster";
-    if (layer.renderMode === "tile") return zoom < layer.minZoomForFeatures ? "cluster" : "feature";
 
     if (layer.geometryType === "Point" && layer.featureCount > 100) {
-      if (zoom < layer.minZoomForClusters) return "region";
-      if (zoom < layer.minZoomForFeatures) return "cluster";
+      if (zoom <= 11) return "sido";
+      if (zoom <= 13) return "sigungu";
+      if (zoom <= 16) return "cluster";
       return "feature";
     }
 
@@ -442,20 +466,34 @@ export function MapViewer({
     const tier = getZoomTier(layer, zoom);
 
     try {
-      if (tier === "region") {
-        const res = await fetch(`/api/layers/${layer.id}/aggregate?bbox=${bbox}&gridSize=5`);
+      if (tier === "sido" || tier === "sigungu") {
+        const level = tier === "sido" ? "시도" : "시군구";
+        const res = await fetch(`/api/layers/${layer.id}/boundary-aggregate?bbox=${bbox}&level=${encodeURIComponent(level)}`);
         if (layerRequestVersionRef.current.get(layer.id) !== version) return;
-        const gridData = await res.json();
+        const boundaryData = await res.json();
 
         const source = new VectorSource();
-        gridData.forEach((cell: { lng: number; lat: number; count: number }) => {
-          const feature = new OlFeature({
-            geometry: new Point(fromLonLat([cell.lng, cell.lat])),
-            count: cell.count,
-            name: `${cell.count} features`,
-          });
-          feature.setStyle(getRegionStyle(cell.count, layer));
-          source.addFeature(feature);
+        const geojsonFormat = new GeoJSON();
+        boundaryData.forEach((b: { boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number; geometry: any }) => {
+          try {
+            const geojsonFeature = {
+              type: "Feature",
+              geometry: b.geometry,
+              properties: {},
+            };
+            const olFeatures = geojsonFormat.readFeatures(geojsonFeature, {
+              featureProjection: "EPSG:3857",
+            });
+            if (olFeatures.length > 0) {
+              const feature = olFeatures[0];
+              feature.set("count", b.count);
+              feature.set("name", b.name);
+              feature.set("boundaryId", b.boundaryId);
+              feature.setStyle(getBoundaryStyle(b.count, b.name, layer, level));
+              source.addFeature(feature);
+            }
+          } catch (e) {
+          }
         });
 
         if (layerRequestVersionRef.current.get(layer.id) !== version) return;
