@@ -5,7 +5,8 @@ import {
   type SpatialQuery, type InsertSpatialQuery,
   type Basemap, type InsertBasemap,
   type AppSetting, type InsertAppSetting,
-  users, layers, features, spatialQueries, basemaps, appSettings,
+  type AdminBoundary, type InsertAdminBoundary,
+  users, layers, features, spatialQueries, basemaps, appSettings, administrativeBoundaries,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
@@ -45,6 +46,12 @@ export interface IStorage {
   getSettings(category?: string): Promise<AppSetting[]>;
   getSetting(key: string): Promise<AppSetting | undefined>;
   upsertSetting(setting: InsertAppSetting): Promise<AppSetting>;
+
+  getAdminBoundaries(level?: string): Promise<AdminBoundary[]>;
+  getAdminBoundary(id: string): Promise<AdminBoundary | undefined>;
+  createAdminBoundaries(boundaries: InsertAdminBoundary[]): Promise<AdminBoundary[]>;
+  deleteAdminBoundariesByLevel(level: string): Promise<number>;
+  getAdminBoundaryLevels(): Promise<{ level: string; count: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -309,6 +316,45 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return result;
+  }
+
+  async getAdminBoundaries(level?: string): Promise<AdminBoundary[]> {
+    if (level) {
+      return db.select().from(administrativeBoundaries).where(eq(administrativeBoundaries.level, level));
+    }
+    return db.select().from(administrativeBoundaries);
+  }
+
+  async getAdminBoundary(id: string): Promise<AdminBoundary | undefined> {
+    const [boundary] = await db.select().from(administrativeBoundaries).where(eq(administrativeBoundaries.id, id));
+    return boundary || undefined;
+  }
+
+  async createAdminBoundaries(boundaryList: InsertAdminBoundary[]): Promise<AdminBoundary[]> {
+    if (boundaryList.length === 0) return [];
+    const batchSize = 50;
+    const results: AdminBoundary[] = [];
+    for (let i = 0; i < boundaryList.length; i += batchSize) {
+      const batch = boundaryList.slice(i, i + batchSize);
+      const created = await db.insert(administrativeBoundaries).values(batch).returning();
+      results.push(...created);
+    }
+    return results;
+  }
+
+  async deleteAdminBoundariesByLevel(level: string): Promise<number> {
+    const result = await db.delete(administrativeBoundaries).where(eq(administrativeBoundaries.level, level)).returning();
+    return result.length;
+  }
+
+  async getAdminBoundaryLevels(): Promise<{ level: string; count: number }[]> {
+    const result = await db.execute(sql`
+      SELECT level, count(*)::int as count
+      FROM administrative_boundaries
+      GROUP BY level
+      ORDER BY level
+    `);
+    return (result.rows as any[]).map(r => ({ level: r.level, count: r.count }));
   }
 
   private async updateLayerStats(layerId: string): Promise<void> {

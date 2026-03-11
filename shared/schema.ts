@@ -117,6 +117,29 @@ export const insertAppSettingSchema = createInsertSchema(appSettings);
 export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
 export type AppSetting = typeof appSettings.$inferSelect;
 
+export const administrativeBoundaries = pgTable("administrative_boundaries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+  level: text("level").notNull(),
+  parentCode: text("parent_code"),
+  geometry: jsonb("geometry").notNull(),
+  properties: jsonb("properties").notNull().default({}),
+  minLng: real("min_lng"),
+  minLat: real("min_lat"),
+  maxLng: real("max_lng"),
+  maxLat: real("max_lat"),
+  centerLng: real("center_lng"),
+  centerLat: real("center_lat"),
+});
+
+export const insertAdminBoundarySchema = createInsertSchema(administrativeBoundaries).omit({
+  id: true,
+});
+
+export type InsertAdminBoundary = z.infer<typeof insertAdminBoundarySchema>;
+export type AdminBoundary = typeof administrativeBoundaries.$inferSelect;
+
 export const spatialQueries = pgTable("spatial_queries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),

@@ -21,13 +21,14 @@ import {
   CheckCircle2, Settings2, Sun, Moon, Palette, X,
   ChevronDown, ChevronRight, Tag, Building2, Share2, BarChart3,
   Database, Monitor, ArrowRight, ArrowDown, Shield, Workflow,
+  Upload, MapPin, Loader2, AlertCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
 import { LAYER_PALETTE } from "@/lib/colorPalette";
 import { Check } from "lucide-react";
 
-type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" | "ml-server" | "products" | "architecture";
+type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" | "admin-boundaries" | "ml-server" | "products" | "architecture";
 
 interface SettingsPopupProps {
   open: boolean;
@@ -41,6 +42,7 @@ const NAV_ITEMS: { id: SettingsSection; label: string; icon: typeof Settings2 }[
   { id: "basemaps", label: "배경 지도 관리", icon: Globe },
   { id: "rendering", label: "대용량 렌더링 설정", icon: Gauge },
   { id: "map", label: "지도 기본 설정", icon: Map },
+  { id: "admin-boundaries", label: "행정구역 경계", icon: MapPin },
   { id: "ml-server", label: "ML 연산 서버 설정", icon: Cpu },
   { id: "products", label: "제품 라인업", icon: Package },
   { id: "architecture", label: "시스템 아키텍처", icon: Server },
@@ -429,6 +431,8 @@ export default function SettingsPopup({ open, onClose, onAddLayer }: SettingsPop
             onUpdate={(key, value) => updateSettingMutation.mutate({ key, value })}
           />
         );
+      case "admin-boundaries":
+        return <AdminBoundariesSection />;
       case "ml-server":
         return <MLServerSection />;
       case "products":
@@ -1592,6 +1596,249 @@ function ProductsSection() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function AdminBoundariesSection() {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadLevel, setUploadLevel] = useState<string>("시도");
+  const [uploadSrid, setUploadSrid] = useState<string>("EPSG:5179");
+  const [nameField, setNameField] = useState<string>("SIDO_NM");
+  const [codeField, setCodeField] = useState<string>("SIDO_CD");
+  const [parentCodeField, setParentCodeField] = useState<string>("");
+
+  const { data: levels = [], refetch } = useQuery<{ level: string; count: number }[]>({
+    queryKey: ["/api/admin-boundaries/levels"],
+  });
+
+  const levelPresets: Record<string, { nameField: string; codeField: string; parentCodeField: string }> = {
+    "시도": { nameField: "SIDO_NM", codeField: "SIDO_CD", parentCodeField: "" },
+    "시군구": { nameField: "SIGUNGU_NM", codeField: "SIGUNGU_CD", parentCodeField: "SIDO_CD" },
+    "읍면동": { nameField: "EMD_NM", codeField: "EMD_CD", parentCodeField: "SIGUNGU_CD" },
+  };
+
+  const handleLevelChange = (level: string) => {
+    setUploadLevel(level);
+    const preset = levelPresets[level];
+    if (preset) {
+      setNameField(preset.nameField);
+      setCodeField(preset.codeField);
+      setParentCodeField(preset.parentCodeField);
+    }
+  };
+
+  const handleUpload = async () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) {
+      toast({ title: "파일을 선택해주세요", variant: "destructive" });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("level", uploadLevel);
+      formData.append("srid", uploadSrid);
+      formData.append("nameField", nameField);
+      formData.append("codeField", codeField);
+      if (parentCodeField) formData.append("parentCodeField", parentCodeField);
+
+      const response = await fetch("/api/admin-boundaries/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+
+      toast({ title: `${uploadLevel} 경계 데이터 업로드 완료`, description: `${result.count}개 행정구역 등록` });
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin-boundaries"] });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (e: any) {
+      toast({ title: "업로드 실패", description: e.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (level: string) => {
+    try {
+      const response = await fetch(`/api/admin-boundaries/${encodeURIComponent(level)}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      toast({ title: `${level} 경계 데이터 삭제 완료`, description: `${result.deleted}개 삭제됨` });
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin-boundaries"] });
+    } catch (e: any) {
+      toast({ title: "삭제 실패", description: e.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-6" data-testid="admin-boundaries-section">
+      <div>
+        <h2 className="text-lg font-bold">행정구역 경계 데이터</h2>
+        <p className="text-sm text-muted-foreground mt-1">시도 / 시군구 / 읍면동 행정구역 경계 데이터를 관리합니다. Shapefile(ZIP) 또는 GeoJSON 형식을 지원합니다.</p>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <Database className="w-4 h-4 text-primary" />
+          등록된 행정구역 데이터
+        </h3>
+
+        {levels.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground" data-testid="no-boundaries">
+            <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">등록된 행정구역 경계 데이터가 없습니다</p>
+            <p className="text-xs mt-1">아래에서 Shapefile(ZIP) 또는 GeoJSON을 업로드하세요</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {levels.map((l) => (
+              <div key={l.level} className="flex items-center justify-between rounded-lg border px-4 py-3" data-testid={`boundary-level-${l.level}`}>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">{l.level}</Badge>
+                  <span className="text-sm font-medium">{l.count}개 행정구역</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(l.level)}
+                  className="text-destructive hover:text-destructive"
+                  data-testid={`delete-boundary-${l.level}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <Upload className="w-4 h-4 text-primary" />
+          행정구역 데이터 업로드
+        </h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs">행정구역 단위</Label>
+            <Select value={uploadLevel} onValueChange={handleLevelChange}>
+              <SelectTrigger data-testid="select-boundary-level">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="시도">시도</SelectItem>
+                <SelectItem value="시군구">시군구</SelectItem>
+                <SelectItem value="읍면동">읍면동</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">원본 좌표계 (SRID)</Label>
+            <Select value={uploadSrid} onValueChange={setUploadSrid}>
+              <SelectTrigger data-testid="select-boundary-srid">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="EPSG:5179">EPSG:5179 (Korea 2000 / Unified)</SelectItem>
+                <SelectItem value="EPSG:5181">EPSG:5181 (Korea 2000 / Central)</SelectItem>
+                <SelectItem value="EPSG:5186">EPSG:5186 (Korea 2000 / Central 2010)</SelectItem>
+                <SelectItem value="EPSG:4326">EPSG:4326 (WGS84 - 변환 불필요)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs">이름 필드</Label>
+            <Input value={nameField} onChange={e => setNameField(e.target.value)} placeholder="SIDO_NM" className="text-xs" data-testid="input-name-field" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">코드 필드</Label>
+            <Input value={codeField} onChange={e => setCodeField(e.target.value)} placeholder="SIDO_CD" className="text-xs" data-testid="input-code-field" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">상위코드 필드</Label>
+            <Input value={parentCodeField} onChange={e => setParentCodeField(e.target.value)} placeholder="(선택사항)" className="text-xs" data-testid="input-parent-code-field" />
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-dashed p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>같은 단위의 기존 데이터는 자동으로 교체됩니다. Shapefile은 ZIP으로 압축하여 업로드하세요.</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".zip,.geojson,.json"
+              className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 flex-1"
+              data-testid="input-boundary-file"
+            />
+            <Button
+              onClick={handleUpload}
+              disabled={uploading}
+              size="sm"
+              className="gap-1.5"
+              data-testid="button-upload-boundary"
+            >
+              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              {uploading ? "업로드 중..." : "업로드"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="rounded-lg border bg-card/50 p-4 space-y-2">
+        <h4 className="text-xs font-semibold text-muted-foreground">지원 데이터 소스</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-3 h-3 mt-0.5 text-green-500" />
+            <div>
+              <span className="font-medium text-foreground">국토정보플랫폼</span>
+              <p>행정경계(시도/시군구/읍면동) Shapefile</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-3 h-3 mt-0.5 text-green-500" />
+            <div>
+              <span className="font-medium text-foreground">통계청 SGIS</span>
+              <p>통계지리정보서비스 행정경계</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-3 h-3 mt-0.5 text-green-500" />
+            <div>
+              <span className="font-medium text-foreground">EPSG:5179 / 5181</span>
+              <p>자동 4326(WGS84) 재투영</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-3 h-3 mt-0.5 text-green-500" />
+            <div>
+              <span className="font-medium text-foreground">GeoJSON / Shapefile</span>
+              <p>ZIP 압축 Shapefile 또는 GeoJSON</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -27,13 +27,14 @@
 - `layers` - 레이어 메타데이터 (렌더링 모드, 피처 제한, 최소 줌, 타일 설정 등)
 - `features` - GeoJSON 지오메트리 + 인덱싱된 lat/lng/bbox 컬럼
 - `basemaps` - 배경지도 제공자 설정 (provider, URL 템플릿, API 키, 활성/기본 플래그)
+- `administrative_boundaries` - 행정구역 경계 (시도/시군구/읍면동, GeoJSON geometry, 코드, 상위코드, bounds)
 - `app_settings` - 애플리케이션 설정 (키-값, 카테고리: rendering, map)
 - `spatial_queries` - 저장된 공간 쿼리 이력
 
 ## 주요 파일
 - `client/src/pages/product-info.tsx` - 제품 소개 페이지 (기능 설명, 기술 스택)
 - `shared/schema.ts` - Drizzle 스키마 정의
-- `server/routes.ts` - API 엔드포인트 (레이어 CRUD, 피처, 집계, 공간 쿼리, 배경지도, 설정)
+- `server/routes.ts` - API 엔드포인트 (레이어 CRUD, 피처, 집계, 공간 쿼리, 배경지도, 설정, 행정경계 업로드)
 - `server/storage.ts` - DatabaseStorage (공간 연산 포함)
 - `server/seed.ts` - 시드 데이터 (서울: 공공시설 200개, 도로 30개, 행정구역 5개, 기본 배경지도, 기본 설정)
 - **데이터**: 총 6개 레이어 (인프라/교통/행정 3개 + 응급출동 2020/2021/2022 약 165만 건)

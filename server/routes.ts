@@ -2,7 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLayerSchema, insertFeatureSchema, insertBasemapSchema, insertAppSettingSchema } from "@shared/schema";
+import type { InsertAdminBoundary } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import proj4 from "proj4";
+import * as fs from "fs";
+import * as shapefile from "shapefile";
+
+const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 200 * 1024 * 1024 } });
 
 export async function registerRoutes(
   httpServer: Server,
@@ -245,6 +252,198 @@ export async function registerRoutes(
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }
+  });
+
+  // Administrative Boundaries
+  app.get("/api/admin-boundaries", async (req, res) => {
+    const { level } = req.query;
+    const boundaries = await storage.getAdminBoundaries(level as string | undefined);
+    res.json(boundaries);
+  });
+
+  app.get("/api/admin-boundaries/levels", async (_req, res) => {
+    const levels = await storage.getAdminBoundaryLevels();
+    res.json(levels);
+  });
+
+  app.get("/api/admin-boundaries/geojson", async (req, res) => {
+    const { level } = req.query;
+    if (!level) return res.status(400).json({ message: "level 파라미터가 필요합니다" });
+    const boundaries = await storage.getAdminBoundaries(level as string);
+    res.json({
+      type: "FeatureCollection",
+      features: boundaries.map(b => ({
+        type: "Feature",
+        id: b.id,
+        geometry: b.geometry,
+        properties: { ...b.properties as object, name: b.name, code: b.code, level: b.level, parentCode: b.parentCode },
+      })),
+    });
+  });
+
+  function flattenAllCoords(geom: any): number[][] {
+    if (geom.type === 'Point') return [geom.coordinates];
+    if (geom.type === 'MultiPoint' || geom.type === 'LineString') return geom.coordinates;
+    if (geom.type === 'MultiLineString' || geom.type === 'Polygon') return geom.coordinates.flat();
+    if (geom.type === 'MultiPolygon') return geom.coordinates.flat(2);
+    return [];
+  }
+
+  proj4.defs('EPSG:5179', '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs');
+  proj4.defs('EPSG:5181', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +units=m +no_defs');
+  proj4.defs('EPSG:5186', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +units=m +no_defs');
+
+  function simplifyRing(ring: number[][], tolerance: number): number[][] {
+    if (ring.length <= 4) return ring;
+    function perpDist(pt: number[], a: number[], b: number[]): number {
+      const dx = b[0]-a[0], dy = b[1]-a[1], len2 = dx*dx+dy*dy;
+      if (len2 === 0) return Math.sqrt((pt[0]-a[0])**2+(pt[1]-a[1])**2);
+      const t = Math.max(0, Math.min(1, ((pt[0]-a[0])*dx+(pt[1]-a[1])*dy)/len2));
+      return Math.sqrt((pt[0]-a[0]-t*dx)**2+(pt[1]-a[1]-t*dy)**2);
+    }
+    const stack: [number,number][] = [[0, ring.length-1]];
+    const keep = new Set<number>([0, ring.length-1]);
+    while (stack.length > 0) {
+      const [s,e] = stack.pop()!;
+      let mx=0, mi=s;
+      for (let i=s+1; i<e; i++) { const d=perpDist(ring[i],ring[s],ring[e]); if(d>mx){mx=d;mi=i;} }
+      if (mx > tolerance) { keep.add(mi); if(mi-s>1)stack.push([s,mi]); if(e-mi>1)stack.push([mi,e]); }
+    }
+    return Array.from(keep).sort((a,b)=>a-b).map(i=>ring[i]);
+  }
+
+  function simplifyAndReproject(geom: any, fromSrid: string, tolerance: number): any {
+    const type = geom.type;
+    if (type === 'Point') return { ...geom, coordinates: proj4(fromSrid, 'EPSG:4326', geom.coordinates) };
+    if (type === 'MultiPoint' || type === 'LineString') return { ...geom, coordinates: geom.coordinates.map((c: number[]) => proj4(fromSrid, 'EPSG:4326', c)) };
+    if (type === 'Polygon' || type === 'MultiLineString') {
+      return { ...geom, coordinates: geom.coordinates.map((ring: number[][]) => {
+        const s = simplifyRing(ring, tolerance);
+        return s.map((c: number[]) => proj4(fromSrid, 'EPSG:4326', c));
+      })};
+    }
+    if (type === 'MultiPolygon') {
+      return { ...geom, coordinates: geom.coordinates
+        .map((poly: number[][][]) => poly.map((ring: number[][]) => {
+          const s = simplifyRing(ring, tolerance);
+          return s.map((c: number[]) => proj4(fromSrid, 'EPSG:4326', c));
+        }))
+        .filter((poly: number[][][]) => poly[0] && poly[0].length >= 4)
+      };
+    }
+    return geom;
+  }
+
+  app.post("/api/admin-boundaries/upload", upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "파일이 필요합니다" });
+
+      const level = req.body.level;
+      const srid = req.body.srid || "EPSG:5179";
+      const nameField = req.body.nameField || "SIDO_NM";
+      const codeField = req.body.codeField || "SIDO_CD";
+      const parentCodeField = req.body.parentCodeField;
+
+      if (!level) return res.status(400).json({ message: "level(시도/시군구/읍면동)이 필요합니다" });
+
+      const filePath = req.file.path;
+      const originalName = req.file.originalname || "";
+      let featuresList: any[] = [];
+
+      if (originalName.endsWith('.geojson') || originalName.endsWith('.json')) {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        const geojsonData = JSON.parse(raw);
+        const fc = geojsonData.type === 'FeatureCollection' ? geojsonData :
+                   Array.isArray(geojsonData) ? geojsonData[0] : geojsonData;
+        if (!fc || !fc.features) {
+          fs.unlinkSync(filePath);
+          return res.status(400).json({ message: "GeoJSON FeatureCollection을 찾을 수 없습니다" });
+        }
+        featuresList = fc.features;
+        fs.unlinkSync(filePath);
+      } else if (originalName.endsWith('.zip')) {
+        const { execSync } = await import('child_process');
+        const tmpDir = `/tmp/shp_extract_${Date.now()}`;
+        fs.mkdirSync(tmpDir, { recursive: true });
+        execSync(`unzip -o "${filePath}" -d "${tmpDir}"`, { encoding: 'utf-8' });
+        fs.unlinkSync(filePath);
+
+        const files = fs.readdirSync(tmpDir);
+        const shpFile = files.find(f => f.endsWith('.shp'));
+        const dbfFile = files.find(f => f.endsWith('.dbf'));
+        if (!shpFile || !dbfFile) {
+          execSync(`rm -rf "${tmpDir}"`);
+          return res.status(400).json({ message: "ZIP 내에 .shp 및 .dbf 파일이 필요합니다" });
+        }
+
+        const cpgFile = files.find(f => f.endsWith('.cpg'));
+        let encoding = 'utf-8';
+        if (cpgFile) {
+          encoding = fs.readFileSync(`${tmpDir}/${cpgFile}`, 'utf-8').trim() || 'utf-8';
+        }
+
+        const source = await shapefile.open(`${tmpDir}/${shpFile}`, `${tmpDir}/${dbfFile}`, { encoding });
+        while (true) {
+          const result = await source.read();
+          if (result.done) break;
+          featuresList.push(result.value);
+        }
+        execSync(`rm -rf "${tmpDir}"`);
+      } else {
+        fs.unlinkSync(filePath);
+        return res.status(400).json({ message: "지원 형식: .zip (Shapefile), .geojson, .json" });
+      }
+
+      if (featuresList.length === 0) {
+        return res.status(400).json({ message: "파일에서 피처를 찾을 수 없습니다" });
+      }
+
+      const needsReproject = srid !== 'EPSG:4326';
+      const tolerance = srid === 'EPSG:4326' ? 0.0005 : 50;
+
+      const boundaries: InsertAdminBoundary[] = featuresList.map((f: any) => {
+        let geometry = f.geometry;
+        if (needsReproject) {
+          geometry = simplifyAndReproject(geometry, srid, tolerance);
+        }
+
+        const flatCoords = flattenAllCoords(geometry);
+        const lngs = flatCoords.map((c: number[]) => c[0]);
+        const lats = flatCoords.map((c: number[]) => c[1]);
+
+        const name = f.properties?.[nameField] || f.properties?.name || '알 수 없음';
+        const code = f.properties?.[codeField] || f.properties?.code || '';
+        const parentCode = parentCodeField ? (f.properties?.[parentCodeField] || null) : null;
+
+        return {
+          name,
+          code: String(code),
+          level,
+          parentCode: parentCode ? String(parentCode) : null,
+          geometry,
+          properties: f.properties || {},
+          minLng: Math.min(...lngs),
+          minLat: Math.min(...lats),
+          maxLng: Math.max(...lngs),
+          maxLat: Math.max(...lats),
+          centerLng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+          centerLat: (Math.min(...lats) + Math.max(...lats)) / 2,
+        };
+      });
+
+      await storage.deleteAdminBoundariesByLevel(level);
+      const created = await storage.createAdminBoundaries(boundaries);
+
+      res.json({ success: true, level, count: created.length });
+    } catch (e: any) {
+      console.error("Admin boundary upload error:", e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/admin-boundaries/:level", async (req, res) => {
+    const count = await storage.deleteAdminBoundariesByLevel(req.params.level);
+    res.json({ success: true, deleted: count });
   });
 
   // Stats endpoint
