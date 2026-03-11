@@ -8,7 +8,7 @@ import VectorSource from "ol/source/Vector";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
 import GeoJSON from "ol/format/GeoJSON";
-import { fromLonLat, toLonLat } from "ol/proj";
+import { fromLonLat, toLonLat, transformExtent } from "ol/proj";
 import { Style, Fill, Stroke, Circle as CircleStyle, Text as TextStyle } from "ol/style";
 import { Feature as OlFeature } from "ol";
 import { Point, Circle as CircleGeom } from "ol/geom";
@@ -150,6 +150,7 @@ export function MapViewer({
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [basemapPickerOpen, setBasemapPickerOpen] = useState(false);
   const tileErrorCountRef = useRef(0);
+  const prevVisibleIdsRef = useRef<Set<string>>(new Set());
 
   const { data: basemapList = [] } = useQuery<Basemap[]>({
     queryKey: ["/api/basemaps"],
@@ -478,6 +479,48 @@ export function MapViewer({
       }
     };
   }, [layerList, currentZoom, fetchAndRenderLayer]);
+
+  useEffect(() => {
+    if (!mapInstance.current) return;
+
+    const currentVisibleIds = new Set(
+      layerList.filter(l => l.visible).map(l => l.id)
+    );
+    const prevIds = prevVisibleIdsRef.current;
+
+    const hasNewLayer = [...currentVisibleIds].some(id => !prevIds.has(id));
+
+    prevVisibleIdsRef.current = currentVisibleIds;
+
+    if (!hasNewLayer) return;
+
+    const visibleWithBounds = layerList.filter(
+      l => l.visible && l.bounds && l.bounds.length === 4
+    );
+
+    if (visibleWithBounds.length === 0) return;
+
+    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+    for (const layer of visibleWithBounds) {
+      const [lngMin, latMin, lngMax, latMax] = layer.bounds!;
+      if (lngMin < minLng) minLng = lngMin;
+      if (latMin < minLat) minLat = latMin;
+      if (lngMax > maxLng) maxLng = lngMax;
+      if (latMax > maxLat) maxLat = latMax;
+    }
+
+    const extent = transformExtent(
+      [minLng, minLat, maxLng, maxLat],
+      "EPSG:4326",
+      "EPSG:3857"
+    );
+
+    mapInstance.current.getView().fit(extent, {
+      padding: [50, 50, 50, 50],
+      duration: 500,
+      maxZoom: 16,
+    });
+  }, [layerList]);
 
   useEffect(() => {
     if (!radiusLayerRef.current) return;
