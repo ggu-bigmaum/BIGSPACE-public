@@ -134,6 +134,18 @@ export async function registerRoutes(
     res.json({ deleted: count });
   });
 
+  app.get("/api/layers/:id/features-in-bbox", async (req, res) => {
+    const { bbox, limit: limitStr } = req.query;
+    if (!bbox || typeof bbox !== "string") {
+      return res.status(400).json({ message: "bbox required" });
+    }
+    const parsedBbox = (bbox as string).split(",").map(Number);
+    if (parsedBbox.length !== 4) return res.status(400).json({ message: "Invalid bbox" });
+    const limit = limitStr ? Math.min(parseInt(limitStr as string, 10), 5000) : 1000;
+    const data = await storage.getFeaturesInBbox(req.params.id, parsedBbox, limit);
+    res.json(data);
+  });
+
   // Grid aggregation for low zoom
   app.get("/api/layers/:id/aggregate", async (req, res) => {
     const { bbox, gridSize } = req.query;

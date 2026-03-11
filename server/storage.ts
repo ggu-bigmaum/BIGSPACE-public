@@ -32,6 +32,7 @@ export interface IStorage {
   getFeatureCount(layerId: string): Promise<number>;
 
   getFeaturesInRadius(lng: number, lat: number, radiusKm: number, layerIds?: string[]): Promise<Feature[]>;
+  getFeaturesInBbox(layerId: string, bbox: number[], limit: number): Promise<{ count: number; features: { id: string; lng: number; lat: number; properties: any }[] }>;
   getGridAggregation(layerId: string, bbox: number[], gridSize: number): Promise<{ lng: number; lat: number; count: number }[]>;
 
   createSpatialQuery(query: InsertSpatialQuery): Promise<SpatialQuery>;
@@ -183,6 +184,36 @@ export class DatabaseStorage implements IStorage {
       const dist = Math.sqrt(dx * dx + dy * dy) * 111.32;
       return dist <= radiusKm;
     });
+  }
+
+  async getFeaturesInBbox(layerId: string, bbox: number[], limit: number): Promise<{ count: number; features: { id: string; lng: number; lat: number; properties: any }[] }> {
+    const [minLng, minLat, maxLng, maxLat] = bbox;
+
+    const countResult = await db.execute(sql`
+      SELECT count(*)::int as total FROM ${features}
+      WHERE ${features.layerId} = ${layerId}
+        AND ${features.lng} >= ${minLng}::float AND ${features.lng} <= ${maxLng}::float
+        AND ${features.lat} >= ${minLat}::float AND ${features.lat} <= ${maxLat}::float
+    `);
+    const total = (countResult.rows[0] as any).total;
+
+    const result = await db.execute(sql`
+      SELECT id, lng, lat, properties FROM ${features}
+      WHERE ${features.layerId} = ${layerId}
+        AND ${features.lng} >= ${minLng}::float AND ${features.lng} <= ${maxLng}::float
+        AND ${features.lat} >= ${minLat}::float AND ${features.lat} <= ${maxLat}::float
+      LIMIT ${limit}
+    `);
+
+    return {
+      count: total,
+      features: (result.rows as any[]).map(r => ({
+        id: r.id,
+        lng: r.lng,
+        lat: r.lat,
+        properties: r.properties,
+      })),
+    };
   }
 
   async getGridAggregation(layerId: string, bbox: number[], gridSize: number): Promise<{ lng: number; lat: number; count: number }[]> {

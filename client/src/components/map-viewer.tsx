@@ -11,9 +11,11 @@ import GeoJSON from "ol/format/GeoJSON";
 import { fromLonLat, toLonLat, transformExtent } from "ol/proj";
 import { Style, Fill, Stroke, Circle as CircleStyle, Text as TextStyle } from "ol/style";
 import { Feature as OlFeature } from "ol";
-import { Point, Circle as CircleGeom } from "ol/geom";
+import { Point, Circle as CircleGeom, Polygon as OlPolygon } from "ol/geom";
 import Overlay from "ol/Overlay";
 import { defaults as defaultControls } from "ol/control";
+import DragBox from "ol/interaction/DragBox";
+import { platformModifierKeyOnly, always } from "ol/events/condition";
 import type { Layer, Feature, Basemap } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,13 +23,14 @@ import { Input } from "@/components/ui/input";
 import { formatCoordinate } from "@/lib/mapUtils";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Search, MapPin, Plus, Minus, AlertTriangle, Layers } from "lucide-react";
+import { Search, MapPin, Plus, Minus, AlertTriangle, Layers, BoxSelect, MousePointer } from "lucide-react";
 
 interface MapViewerProps {
   layers: Layer[];
   selectedLayerId: string | null;
   activeTool: string;
   onMapClick?: (lng: number, lat: number) => void;
+  onBoxSelect?: (bbox: [number, number, number, number]) => void;
   onBboxChange?: (bbox: number[]) => void;
   onZoomChange?: (zoom: number) => void;
   radiusCenter?: { lng: number; lat: number } | null;
@@ -201,6 +204,7 @@ export function MapViewer({
   selectedLayerId,
   activeTool,
   onMapClick,
+  onBoxSelect,
   onBboxChange,
   onZoomChange,
   radiusCenter,
@@ -214,6 +218,8 @@ export function MapViewer({
   const layerRequestVersionRef = useRef<Map<string, number>>(new Map());
   const highlightLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const radiusLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const selectionLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const dragBoxRef = useRef<DragBox | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<Overlay | null>(null);
   const searchMarkerRef = useRef<Overlay | null>(null);
@@ -227,6 +233,7 @@ export function MapViewer({
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [basemapPickerOpen, setBasemapPickerOpen] = useState(false);
+  const [mapToolMode, setMapToolMode] = useState<"select" | "boxSelect">("select");
   const tileErrorCountRef = useRef(0);
   const prevVisibleIdsRef = useRef<Set<string>>(new Set());
 
@@ -389,9 +396,72 @@ export function MapViewer({
     if (!mapInstance.current) return;
     const target = mapInstance.current.getTargetElement();
     if (target) {
-      (target as HTMLElement).style.cursor = activeTool === "radius" ? "crosshair" : "default";
+      (target as HTMLElement).style.cursor = mapToolMode === "boxSelect" ? "crosshair" : (activeTool === "radius" ? "crosshair" : "default");
     }
-  }, [activeTool]);
+  }, [activeTool, mapToolMode]);
+
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+
+    if (dragBoxRef.current) {
+      map.removeInteraction(dragBoxRef.current);
+      dragBoxRef.current = null;
+    }
+
+    if (mapToolMode !== "boxSelect") {
+      if (selectionLayerRef.current) {
+        map.removeLayer(selectionLayerRef.current);
+        selectionLayerRef.current = null;
+      }
+      return;
+    }
+
+    const dragBox = new DragBox({ condition: always });
+    dragBoxRef.current = dragBox;
+    map.addInteraction(dragBox);
+
+    if (!selectionLayerRef.current) {
+      const selLayer = new VectorLayer({
+        source: new VectorSource(),
+        style: new Style({
+          stroke: new Stroke({ color: "rgba(0, 200, 255, 0.8)", width: 2, lineDash: [6, 4] }),
+          fill: new Fill({ color: "rgba(0, 200, 255, 0.1)" }),
+        }),
+        zIndex: 9999,
+      });
+      selectionLayerRef.current = selLayer;
+      map.addLayer(selLayer);
+    }
+
+    dragBox.on("boxend", () => {
+      const extent = dragBox.getGeometry().getExtent();
+      const [minX, minY, maxX, maxY] = transformExtent(extent, "EPSG:3857", "EPSG:4326");
+
+      const src = selectionLayerRef.current?.getSource();
+      if (src) {
+        src.clear();
+        const poly = new OlPolygon([[
+          [extent[0], extent[1]],
+          [extent[2], extent[1]],
+          [extent[2], extent[3]],
+          [extent[0], extent[3]],
+          [extent[0], extent[1]],
+        ]]);
+        const feat = new OlFeature({ geometry: poly });
+        src.addFeature(feat);
+      }
+
+      onBoxSelect?.([minX, minY, maxX, maxY]);
+    });
+
+    return () => {
+      if (dragBoxRef.current) {
+        map.removeInteraction(dragBoxRef.current);
+        dragBoxRef.current = null;
+      }
+    };
+  }, [mapToolMode, onBoxSelect]);
 
   useEffect(() => {
     if (!baseTileLayerRef.current || !activeBasemap) return;
@@ -861,7 +931,36 @@ export function MapViewer({
         )}
       </div>
 
-      <div className="absolute top-3 right-3 z-10">
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => {
+            setMapToolMode("select");
+            if (selectionLayerRef.current) {
+              selectionLayerRef.current.getSource()?.clear();
+            }
+            onBoxSelect?.(undefined as any);
+          }}
+          className={`w-8 h-8 backdrop-blur-sm border border-white/10 ${mapToolMode === "select" ? "bg-cyan-600/60 text-white" : "bg-black/60 text-white/70 hover:text-white"}`}
+          data-testid="button-tool-select"
+          title="이동/선택"
+        >
+          <MousePointer className="w-4 h-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setMapToolMode("boxSelect")}
+          className={`w-8 h-8 backdrop-blur-sm border border-white/10 ${mapToolMode === "boxSelect" ? "bg-cyan-600/60 text-white" : "bg-black/60 text-white/70 hover:text-white"}`}
+          data-testid="button-tool-box-select"
+          title="영역 선택"
+        >
+          <BoxSelect className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <div className="absolute bottom-3 right-3 z-10">
         <div className="bg-black/50 backdrop-blur-sm rounded-md px-2.5 py-1 flex items-center gap-2">
           <span className="text-[10px] font-mono text-white/70" data-testid="text-zoom-level">Z{currentZoom}</span>
           <span className="text-[10px] font-mono text-cyan-400 font-bold" data-testid="text-scale-ratio">1:{getApproxScale(currentZoom)}</span>

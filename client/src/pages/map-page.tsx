@@ -5,6 +5,7 @@ import { MapViewer } from "@/components/map-viewer";
 import { RadiusSearchPanel } from "@/components/radius-search-panel";
 import { FeatureInfoPanel } from "@/components/feature-info-panel";
 import { SpatialAnalysisPanel } from "@/components/spatial-analysis-panel";
+import { BoxSelectPanel } from "@/components/box-select-panel";
 import { useToast } from "@/hooks/use-toast";
 
 interface MapPageProps {
@@ -22,6 +23,7 @@ export default function MapPage({
   const { toast } = useToast();
   const [currentBbox, setCurrentBbox] = useState<number[]>([]);
   const [currentZoom, setCurrentZoom] = useState(11);
+  const [selectionBbox, setSelectionBbox] = useState<[number, number, number, number] | null>(null);
 
   const [radiusCenter, setRadiusCenter] = useState<{ lng: number; lat: number } | null>(null);
   const [radiusKm, setRadiusKm] = useState(2);
@@ -39,6 +41,14 @@ export default function MapPage({
       setRadiusCenter({ lng, lat });
     }
   }, [activeTool]);
+
+  const handleBoxSelect = useCallback((bbox: [number, number, number, number]) => {
+    if (bbox) {
+      setSelectionBbox(bbox);
+    } else {
+      setSelectionBbox(null);
+    }
+  }, []);
 
   const handleRadiusSearch = async () => {
     if (!radiusCenter) return;
@@ -72,6 +82,7 @@ export default function MapPage({
         selectedLayerId={selectedLayerId}
         activeTool={activeTool || "select"}
         onMapClick={handleMapClick}
+        onBoxSelect={handleBoxSelect}
         onBboxChange={setCurrentBbox}
         onZoomChange={setCurrentZoom}
         radiusCenter={radiusCenter}
@@ -92,7 +103,15 @@ export default function MapPage({
         />
       )}
 
-      {selectedLayer && (
+      {selectionBbox && selectedLayer && (
+        <BoxSelectPanel
+          layer={selectedLayer}
+          bbox={selectionBbox}
+          onClose={() => setSelectionBbox(null)}
+        />
+      )}
+
+      {selectedLayer && !selectionBbox && (
         <FeatureInfoPanel
           layer={selectedLayer}
           bbox={currentBbox}
