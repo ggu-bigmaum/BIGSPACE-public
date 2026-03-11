@@ -13,7 +13,7 @@ import { Style, Fill, Stroke, Circle as CircleStyle, Text as TextStyle } from "o
 import { Feature as OlFeature } from "ol";
 import { Point, Circle as CircleGeom } from "ol/geom";
 import Overlay from "ol/Overlay";
-import { defaults as defaultControls } from "ol/control";
+import { defaults as defaultControls, ScaleLine } from "ol/control";
 import type { Layer, Feature, Basemap } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -140,6 +140,31 @@ function getClusterStyle(count: number) {
   });
 }
 
+function getApproxScale(zoom: number): string {
+  const scaleMap: Record<number, string> = {
+    2: "150,000,000",
+    3: "70,000,000",
+    4: "35,000,000",
+    5: "15,000,000",
+    6: "10,000,000",
+    7: "4,000,000",
+    8: "2,000,000",
+    9: "1,000,000",
+    10: "500,000",
+    11: "250,000",
+    12: "150,000",
+    13: "70,000",
+    14: "35,000",
+    15: "15,000",
+    16: "8,000",
+    17: "4,000",
+    18: "2,000",
+    19: "1,000",
+    20: "500",
+  };
+  return scaleMap[zoom] || scaleMap[Math.min(20, Math.max(2, Math.round(zoom)))] || "N/A";
+}
+
 export function MapViewer({
   layers: layerList,
   selectedLayerId,
@@ -209,7 +234,13 @@ export function MapViewer({
         maxZoom: 20,
         minZoom: 2,
       }),
-      controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
+      controls: defaultControls({ zoom: false, rotate: false, attribution: false }).extend([
+        new ScaleLine({
+          units: 'metric',
+          bar: false,
+          minWidth: 100,
+        }),
+      ]),
     });
 
     const highlightSource = new VectorSource();
@@ -805,6 +836,7 @@ export function MapViewer({
       <div className="absolute top-3 right-3 z-10">
         <div className="bg-black/50 backdrop-blur-sm rounded-md px-2.5 py-1 flex items-center gap-2">
           <span className="text-[10px] font-mono text-white/70">Z{currentZoom}</span>
+          <span className="text-[10px] font-mono text-cyan-400/80">1:{getApproxScale(currentZoom)}</span>
           {cursorCoord && (
             <span className="text-[10px] font-mono text-white/50">
               {formatCoordinate(cursorCoord[1], "lat")}, {formatCoordinate(cursorCoord[0], "lng")}
