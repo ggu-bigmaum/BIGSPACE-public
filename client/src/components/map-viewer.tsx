@@ -559,7 +559,7 @@ export function MapViewer({
         const naverMapsLocal = (window as any).naver.maps;
         const view = map.getView();
         const center = toLonLat(view.getCenter()!);
-        const zoom = view.getZoom() || 11;
+        const zoom = Math.round(view.getZoom() || 11);
         nMap.setCenter(new naverMapsLocal.LatLng(center[1], center[0]));
         nMap.setZoom(zoom);
       };
