@@ -426,13 +426,14 @@ export function MapViewer({
     baseTileLayerRef.current.setSource(source);
   }, [activeBasemap]);
 
-  const getZoomTier = useCallback((layer: Layer, zoom: number): "sido" | "sigungu" | "cluster" | "feature" => {
+  const getZoomTier = useCallback((layer: Layer, zoom: number): "sido" | "sigungu" | "eupmyeondong" | "cluster" | "feature" => {
     if (layer.renderMode === "feature") return "feature";
 
     if (layer.geometryType === "Point" && layer.featureCount > 100) {
       if (zoom <= 11) return "sido";
-      if (zoom <= 15) return "sigungu";
-      if (zoom <= 16) return "cluster";
+      if (zoom <= 13) return "sigungu";
+      if (zoom <= 16) return "eupmyeondong";
+      if (zoom <= 17) return "cluster";
       return "feature";
     }
 
@@ -466,8 +467,8 @@ export function MapViewer({
     const tier = getZoomTier(layer, zoom);
 
     try {
-      if (tier === "sido" || tier === "sigungu") {
-        const level = tier === "sido" ? "시도" : "시군구";
+      if (tier === "sido" || tier === "sigungu" || tier === "eupmyeondong") {
+        const level = tier === "sido" ? "시도" : tier === "sigungu" ? "시군구" : "읍면동";
         const res = await fetch(`/api/layers/${layer.id}/boundary-aggregate?bbox=${bbox}&level=${encodeURIComponent(level)}`);
         if (layerRequestVersionRef.current.get(layer.id) !== version) return;
         const boundaryData = await res.json();
