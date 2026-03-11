@@ -140,6 +140,21 @@ export const insertAdminBoundarySchema = createInsertSchema(administrativeBounda
 export type InsertAdminBoundary = z.infer<typeof insertAdminBoundarySchema>;
 export type AdminBoundary = typeof administrativeBoundaries.$inferSelect;
 
+export const boundaryAggregateCache = pgTable("boundary_aggregate_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  layerId: varchar("layer_id").notNull(),
+  level: text("level").notNull(),
+  boundaryId: varchar("boundary_id").notNull(),
+  boundaryName: text("boundary_name").notNull(),
+  boundaryCode: text("boundary_code").notNull(),
+  count: integer("count").notNull().default(0),
+  centerLng: real("center_lng").notNull(),
+  centerLat: real("center_lat").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type BoundaryAggregateCache = typeof boundaryAggregateCache.$inferSelect;
+
 export const spatialQueries = pgTable("spatial_queries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),

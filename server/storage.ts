@@ -6,7 +6,8 @@ import {
   type Basemap, type InsertBasemap,
   type AppSetting, type InsertAppSetting,
   type AdminBoundary, type InsertAdminBoundary,
-  users, layers, features, spatialQueries, basemaps, appSettings, administrativeBoundaries,
+  type BoundaryAggregateCache,
+  users, layers, features, spatialQueries, basemaps, appSettings, administrativeBoundaries, boundaryAggregateCache,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
@@ -360,6 +361,27 @@ export class DatabaseStorage implements IStorage {
 
   async getBoundaryAggregation(layerId: string, level: string, bbox: number[]): Promise<{ boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number }[]> {
     const [minLng, minLat, maxLng, maxLat] = bbox;
+
+    const cached = await db.select().from(boundaryAggregateCache)
+      .where(and(
+        eq(boundaryAggregateCache.layerId, layerId),
+        eq(boundaryAggregateCache.level, level),
+      ));
+
+    if (cached.length > 0) {
+      return cached
+        .filter(c => c.centerLng <= maxLng && c.centerLng >= minLng && c.centerLat <= maxLat && c.centerLat >= minLat)
+        .map(c => ({
+          boundaryId: c.boundaryId,
+          name: c.boundaryName,
+          code: c.boundaryCode,
+          count: c.count,
+          centerLng: c.centerLng,
+          centerLat: c.centerLat,
+        }))
+        .sort((a, b) => b.count - a.count);
+    }
+
     const result = await db.execute(sql`
       SELECT
         ab.id as boundary_id,
@@ -381,13 +403,10 @@ export class DatabaseStorage implements IStorage {
         GROUP BY ab2.id
       ) fc ON fc.bid = ab.id
       WHERE ab.level = ${level}
-        AND ab.max_lng >= ${minLng}
-        AND ab.min_lng <= ${maxLng}
-        AND ab.max_lat >= ${minLat}
-        AND ab.min_lat <= ${maxLat}
       ORDER BY count DESC
     `);
-    return (result.rows as any[]).map(r => ({
+
+    const rows = (result.rows as any[]).map(r => ({
       boundaryId: r.boundary_id,
       name: r.name,
       code: r.code,
@@ -395,6 +414,23 @@ export class DatabaseStorage implements IStorage {
       centerLng: r.center_lng,
       centerLat: r.center_lat,
     }));
+
+    const cacheRows = rows.map(r => ({
+      layerId,
+      level,
+      boundaryId: r.boundaryId,
+      boundaryName: r.name,
+      boundaryCode: r.code,
+      count: r.count,
+      centerLng: r.centerLng,
+      centerLat: r.centerLat,
+    }));
+    for (let i = 0; i < cacheRows.length; i += 50) {
+      await db.insert(boundaryAggregateCache).values(cacheRows.slice(i, i + 50));
+    }
+
+    return rows
+      .filter(r => r.centerLng <= maxLng && r.centerLng >= minLng && r.centerLat <= maxLat && r.centerLat >= minLat);
   }
 
   private async updateLayerStats(layerId: string): Promise<void> {
