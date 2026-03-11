@@ -312,6 +312,7 @@ export function MapViewer({
   const kakaoMapObjRef = useRef<any>(null);
   const naverMapDivRef = useRef<HTMLDivElement>(null);
   const naverMapObjRef = useRef<any>(null);
+  const syncCleanupRef = useRef<(() => void) | null>(null);
   const mapInstance = useRef<OlMap | null>(null);
   const baseTileLayerRef = useRef<TileLayer | null>(null);
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
@@ -571,6 +572,10 @@ export function MapViewer({
     const isSdkBasemap = isKakao || isNaver;
     let cancelled = false;
 
+    if (syncCleanupRef.current) {
+      syncCleanupRef.current();
+      syncCleanupRef.current = null;
+    }
     if (kakaoMapDivRef.current) kakaoMapDivRef.current.style.display = "none";
     if (naverMapDivRef.current) naverMapDivRef.current.style.display = "none";
 
@@ -607,12 +612,13 @@ export function MapViewer({
           if (!container) return;
           container.style.display = "block";
 
+          let kmap: any;
           if (kakaoMapObjRef.current) {
-            const kmap = kakaoMapObjRef.current;
+            kmap = kakaoMapObjRef.current;
             kmap.setCenter(new kakao.maps.LatLng(lat, lon));
             kmap.setLevel(kakaoZoomFromOl(olZoom));
           } else {
-            const kmap = new kakao.maps.Map(container, {
+            kmap = new kakao.maps.Map(container, {
               center: new kakao.maps.LatLng(lat, lon),
               level: kakaoZoomFromOl(olZoom),
               draggable: false,
@@ -623,18 +629,48 @@ export function MapViewer({
             kmap.setZoomable(false);
             kakaoMapObjRef.current = kmap;
           }
+
+          let rafId = 0;
+          let lastLevel = kmap.getLevel();
+          const syncKakao = () => {
+            if (rafId) return;
+            rafId = requestAnimationFrame(() => {
+              rafId = 0;
+              const v = mapInstance.current?.getView();
+              if (!v) return;
+              const c = v.getCenter();
+              const z = v.getZoom() ?? 11;
+              if (c) {
+                const [lo, la] = toLonLat(c);
+                kmap.setCenter(new kakao.maps.LatLng(la, lo));
+              }
+              const newLevel = kakaoZoomFromOl(z);
+              if (newLevel !== lastLevel) {
+                kmap.setLevel(newLevel);
+                lastLevel = newLevel;
+              }
+            });
+          };
+          view.on("change:center", syncKakao);
+          view.on("change:resolution", syncKakao);
+          syncCleanupRef.current = () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            view.un("change:center", syncKakao);
+            view.un("change:resolution", syncKakao);
+          };
         } else {
           const naver = (window as any).naver;
           const container = naverMapDivRef.current;
           if (!container) return;
           container.style.display = "block";
 
+          let nmap: any;
           if (naverMapObjRef.current) {
-            const nmap = naverMapObjRef.current;
+            nmap = naverMapObjRef.current;
             nmap.setCenter(new naver.maps.LatLng(lat, lon));
             nmap.setZoom(naverZoomFromOl(olZoom));
           } else {
-            const nmap = new naver.maps.Map(container, {
+            nmap = new naver.maps.Map(container, {
               center: new naver.maps.LatLng(lat, lon),
               zoom: naverZoomFromOl(olZoom),
               draggable: false,
@@ -651,6 +687,35 @@ export function MapViewer({
             });
             naverMapObjRef.current = nmap;
           }
+
+          let rafId = 0;
+          let lastZoom = nmap.getZoom();
+          const syncNaver = () => {
+            if (rafId) return;
+            rafId = requestAnimationFrame(() => {
+              rafId = 0;
+              const v = mapInstance.current?.getView();
+              if (!v) return;
+              const c = v.getCenter();
+              const z = v.getZoom() ?? 11;
+              if (c) {
+                const [lo, la] = toLonLat(c);
+                nmap.setCenter(new naver.maps.LatLng(la, lo));
+              }
+              const newZoom = naverZoomFromOl(z);
+              if (newZoom !== lastZoom) {
+                nmap.setZoom(newZoom);
+                lastZoom = newZoom;
+              }
+            });
+          };
+          view.on("change:center", syncNaver);
+          view.on("change:resolution", syncNaver);
+          syncCleanupRef.current = () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            view.un("change:center", syncNaver);
+            view.un("change:resolution", syncNaver);
+          };
         }
       });
     } else {
@@ -691,86 +756,12 @@ export function MapViewer({
       baseTileLayerRef.current.setSource(source);
     }
 
-    return () => { cancelled = true; };
-  }, [activeBasemap]);
-
-  useEffect(() => {
-    const map = mapInstance.current;
-    if (!map || activeBasemap?.provider !== "kakao" || !kakaoMapObjRef.current) return;
-
-    const kakao = (window as any).kakao;
-    if (!kakao?.maps) return;
-
-    const kmap = kakaoMapObjRef.current;
-    let rafId = 0;
-    let lastLevel = kmap.getLevel();
-
-    const syncKakao = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
-        const view = map.getView();
-        const center = view.getCenter();
-        const olZoom = view.getZoom() ?? 11;
-        if (center) {
-          const [lon, lat] = toLonLat(center);
-          kmap.setCenter(new kakao.maps.LatLng(lat, lon));
-        }
-        const newLevel = kakaoZoomFromOl(olZoom);
-        if (newLevel !== lastLevel) {
-          kmap.setLevel(newLevel);
-          lastLevel = newLevel;
-        }
-      });
-    };
-
-    map.getView().on("change:center", syncKakao);
-    map.getView().on("change:resolution", syncKakao);
-
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      map.getView().un("change:center", syncKakao);
-      map.getView().un("change:resolution", syncKakao);
-    };
-  }, [activeBasemap]);
-
-  useEffect(() => {
-    const map = mapInstance.current;
-    if (!map || activeBasemap?.provider !== "naver" || !naverMapObjRef.current) return;
-
-    const naver = (window as any).naver;
-    if (!naver?.maps) return;
-
-    const nmap = naverMapObjRef.current;
-    let rafId = 0;
-    let lastZoom = nmap.getZoom();
-
-    const syncNaver = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
-        const view = map.getView();
-        const center = view.getCenter();
-        const olZoom = view.getZoom() ?? 11;
-        if (center) {
-          const [lon, lat] = toLonLat(center);
-          nmap.setCenter(new naver.maps.LatLng(lat, lon));
-        }
-        const newZoom = naverZoomFromOl(olZoom);
-        if (newZoom !== lastZoom) {
-          nmap.setZoom(newZoom);
-          lastZoom = newZoom;
-        }
-      });
-    };
-
-    map.getView().on("change:center", syncNaver);
-    map.getView().on("change:resolution", syncNaver);
-
-    return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      map.getView().un("change:center", syncNaver);
-      map.getView().un("change:resolution", syncNaver);
+      cancelled = true;
+      if (syncCleanupRef.current) {
+        syncCleanupRef.current();
+        syncCleanupRef.current = null;
+      }
     };
   }, [activeBasemap]);
 
