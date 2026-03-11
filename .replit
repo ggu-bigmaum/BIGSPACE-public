@@ -42,3 +42,9 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_database:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+NCP_CLIENT_ID = "uo1rfaxp6a"
+NCP_CLIENT_SECRET = "tLvgSGSgFIXmKfgUt13PJFqMC84WSl6JGd5HmVFT"
