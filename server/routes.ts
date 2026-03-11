@@ -217,6 +217,38 @@ export async function registerRoutes(
     res.status(503).json({ message: "네이버 지도는 JavaScript SDK 인증이 필요합니다. NCP 콘솔에서 Web 서비스 URL 설정을 확인하세요." });
   });
 
+  app.get("/api/proxy/kakao-tiles/:z/:x/:y", async (req, res) => {
+    try {
+      const z = parseInt(req.params.z);
+      const x = parseInt(req.params.x);
+      const y = parseInt(req.params.y);
+
+      if (isNaN(z) || isNaN(x) || isNaN(y)) {
+        return res.status(400).json({ message: "잘못된 타일 좌표" });
+      }
+
+      const subdomain = (x + y) % 4;
+      const tileUrl = `https://map${subdomain}.daumcdn.net/map_2d/2111ydg/L${z}/${y}/${x}.png`;
+
+      const resp = await fetch(tileUrl, {
+        headers: {
+          "Referer": "https://map.kakao.com/",
+          "User-Agent": "Mozilla/5.0",
+        },
+      });
+      if (!resp.ok) {
+        return res.status(resp.status).send("타일 로드 실패");
+      }
+      const buffer = Buffer.from(await resp.arrayBuffer());
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.send(buffer);
+    } catch (e) {
+      res.status(502).json({ message: "카카오 타일 프록시 오류" });
+    }
+  });
+
   app.get("/api/basemaps", async (_req, res) => {
     const list = await storage.getBasemaps();
     res.json(list);

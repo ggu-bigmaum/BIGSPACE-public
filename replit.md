@@ -52,10 +52,10 @@
 ## UI 디자인
 - **테마**: 라이트/다크 전환 가능 (기본 라이트), 시안/틸 (#00c8dc) 주 액센트, 설정 페이지에서 테마 선택
 - **사이드바**: "GIS 업무 솔루션" 제목, 활성 작업 공간 선택, Switch 토글 + 타입 배지 레이어 목록
-- **지도**: ESRI 위성 배경지도 기본, 상단 좌표 검색, 우측 줌 +/- 버튼
+- **지도**: OSM 배경지도 기본, 상단 좌표 검색, 우측 줌 +/- 버튼
 - **헤더 없음**: 사이드바 옆 지도가 전체 높이 차지
-- **배경지도**: OSM (기본), ESRI 위성 (API 키 불필요), VWorld (API 키 필요), 네이버 (NCP SDK 인증 필요 - 현재 미설정), 카카오 (SDK 연동 완료 - JS키 환경변수 KAKAO_JS_KEY, index.html에 SDK 로드)
-- **카카오 지도 연동**: OpenLayers 뒤에 카카오 SDK div 배치, OL 뷰 동기화 방식. 카카오 선택 시 OL 타일 숨김 + 캔버스 투명 처리. 줌 매핑: kakaoLevel = clamp(1~14, 21-olZoom)
+- **배경지도**: OSM (기본), ESRI 위성 (API 키 불필요), VWorld (API 키 필요), 네이버 (NCP SDK 인증 필요 - 현재 미설정), 카카오 (SDK API 비활성화 상태 - Kakao Developers 콘솔에서 '지도/로컬' API 활성화 필요)
+- **카카오 지도 현황**: SDK 방식 제거됨. `dapi.kakao.com` API가 `OPEN_MAP_AND_LOCAL service disabled` 에러 반환. CDN 번들(`t1.daumcdn.net`)은 SDK 로더 없이 단독 실행 불가. 카카오 타일 프록시(`/api/proxy/kakao-tiles/:z/:x/:y`) 구현됨 (WCONGNAMUL 좌표계 → 직접 타일 접근). 현재 카카오 선택 시 OSM 폴백 + 안내 메시지 표시.
 
 ## API 엔드포인트
 - `GET /api/layers` - 레이어 목록
