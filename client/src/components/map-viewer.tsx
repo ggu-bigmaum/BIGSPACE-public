@@ -431,7 +431,7 @@ export function MapViewer({
 
     if (layer.geometryType === "Point" && layer.featureCount > 100) {
       if (zoom <= 11) return "sido";
-      if (zoom <= 13) return "sigungu";
+      if (zoom <= 15) return "sigungu";
       if (zoom <= 16) return "cluster";
       return "feature";
     }
