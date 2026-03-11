@@ -499,7 +499,7 @@ export function MapViewer({
           vectorLayersRef.current.set(layer.id, vl);
         }
       } else if (tier === "cluster") {
-        const res = await fetch(`/api/layers/${layer.id}/aggregate?bbox=${bbox}&gridSize=20`);
+        const res = await fetch(`/api/layers/${layer.id}/aggregate?bbox=${bbox}&gridSize=8`);
         if (layerRequestVersionRef.current.get(layer.id) !== version) return;
         const gridData = await res.json();
 

@@ -192,8 +192,8 @@ export class DatabaseStorage implements IStorage {
 
     const result = await db.execute(sql`
       SELECT
-        floor((${features.lng} - ${minLng}::float) / ${lngStep}::float) * ${lngStep}::float + ${minLng}::float + ${lngStep}::float/2 as lng,
-        floor((${features.lat} - ${minLat}::float) / ${latStep}::float) * ${latStep}::float + ${minLat}::float + ${latStep}::float/2 as lat,
+        avg(${features.lng})::float as lng,
+        avg(${features.lat})::float as lat,
         count(*)::int as count
       FROM ${features}
       WHERE ${features.layerId} = ${layerId}
@@ -201,10 +201,12 @@ export class DatabaseStorage implements IStorage {
         AND ${features.lng} <= ${maxLng}::float
         AND ${features.lat} >= ${minLat}::float
         AND ${features.lat} <= ${maxLat}::float
-      GROUP BY 1, 2
+      GROUP BY
+        floor((${features.lng} - ${minLng}::float) / ${lngStep}::float),
+        floor((${features.lat} - ${minLat}::float) / ${latStep}::float)
       HAVING count(*) > 0
       ORDER BY count DESC
-      LIMIT 1000
+      LIMIT 500
     `);
 
     return (result.rows as any[]).map(r => ({
