@@ -235,7 +235,7 @@ export async function registerRoutes(
       }
       const loaderCode = await loaderResp.text();
       const mainCode = await mainResp.text();
-      const patchedLoader = `(function(){var _origWrite=document.write;document.write=function(){};try{\n${loaderCode}\n}finally{document.write=_origWrite;}})();\n`;
+      const patchedLoader = `(function(){var _ow=document.write;document.write=function(){};try{\n${loaderCode}\n}finally{document.write=_ow;}})();\n`;
       const combined = patchedLoader + mainCode;
       kakaoSdkCache = { data: combined, fetchedAt: Date.now() };
       res.setHeader("Content-Type", "text/javascript; charset=utf-8");

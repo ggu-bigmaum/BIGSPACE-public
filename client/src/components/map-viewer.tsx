@@ -101,14 +101,23 @@ function loadKakaoSdk(): Promise<boolean> {
       return;
     }
 
+    const kakaoKey = import.meta.env.VITE_KAKAO_JS_KEY || "6d73de94db6c72c50e0fec723f62a1ef";
     const script = document.createElement("script");
-    script.src = "/api/proxy/kakao-sdk";
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&autoload=false`;
     script.onload = () => {
       const k = (window as any).kakao;
-      if (k?.maps?.Map) {
-        resolve(true);
+      if (k?.maps?.load) {
+        k.maps.load(() => {
+          if (k.maps.Map) {
+            resolve(true);
+          } else {
+            console.error("카카오 SDK load() 완료 but Map 생성자 없음");
+            kakaoSdkLoadPromise = null;
+            resolve(false);
+          }
+        });
       } else {
-        console.error("카카오 SDK 로드 완료 but Map 생성자 없음");
+        console.error("카카오 SDK 로드 완료 but load 함수 없음");
         kakaoSdkLoadPromise = null;
         resolve(false);
       }
@@ -516,11 +525,13 @@ export function MapViewer({
     if (!baseTileLayerRef.current || !activeBasemap) return;
 
     const isKakao = activeBasemap.provider === "kakao";
+    let cancelled = false;
 
     if (isKakao) {
       baseTileLayerRef.current.setVisible(false);
 
       loadKakaoSdk().then((ok) => {
+        if (cancelled) return;
         if (!ok) {
           setBasemapError("카카오 지도 SDK 로드에 실패했습니다. 잠시 후 다시 시도하세요.");
           baseTileLayerRef.current?.setVisible(true);
@@ -605,6 +616,8 @@ export function MapViewer({
 
       baseTileLayerRef.current.setSource(source);
     }
+
+    return () => { cancelled = true; };
   }, [activeBasemap]);
 
   useEffect(() => {
