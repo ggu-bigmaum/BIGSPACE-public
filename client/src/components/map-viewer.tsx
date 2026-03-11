@@ -835,8 +835,8 @@ export function MapViewer({
 
       <div className="absolute top-3 right-3 z-10">
         <div className="bg-black/50 backdrop-blur-sm rounded-md px-2.5 py-1 flex items-center gap-2">
-          <span className="text-[10px] font-mono text-white/70">Z{currentZoom}</span>
-          <span className="text-[10px] font-mono text-cyan-400/80">1:{getApproxScale(currentZoom)}</span>
+          <span className="text-[10px] font-mono text-white/70" data-testid="text-zoom-level">Z{currentZoom}</span>
+          <span className="text-[10px] font-mono text-cyan-400 font-bold" data-testid="text-scale-ratio">1:{getApproxScale(currentZoom)}</span>
           {cursorCoord && (
             <span className="text-[10px] font-mono text-white/50">
               {formatCoordinate(cursorCoord[1], "lat")}, {formatCoordinate(cursorCoord[0], "lng")}
