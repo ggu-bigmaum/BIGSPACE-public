@@ -54,8 +54,10 @@
 - **사이드바**: "GIS 업무 솔루션" 제목, 활성 작업 공간 선택, Switch 토글 + 타입 배지 레이어 목록
 - **지도**: OSM 배경지도 기본, 상단 좌표 검색, 우측 줌 +/- 버튼
 - **헤더 없음**: 사이드바 옆 지도가 전체 높이 차지
-- **배경지도**: OSM, ESRI 위성 (API 키 불필요), VWorld (API 키 필요), 네이버 (NCP SDK 인증 필요 - 현재 미설정), 카카오 (기본 배경지도)
-- **카카오 지도 현황**: 공식 SDK URL(`dapi.kakao.com/v2/maps/sdk.js?appkey=KEY&autoload=false`)을 프론트엔드에서 직접 로드, `kakao.maps.load()` 콜백으로 초기화. OpenLayers 뒤에 카카오 `kakao.maps.Map` 인스턴스를 z-index 0으로 배치, OL 이동/줌에 동기화. OL viewport 배경을 투명 처리. 서버 프록시(`/api/proxy/kakao-sdk`)는 레거시로 유지.
+- **배경지도**: OSM, ESRI 위성 (API 키 불필요), VWorld (API 키 필요), 네이버 (NCP SDK 직접 로드), 카카오 (기본 배경지도)
+- **카카오 지도**: 공식 SDK URL(`dapi.kakao.com/v2/maps/sdk.js?appkey=KEY&autoload=false`)을 프론트엔드에서 직접 로드, `kakao.maps.load()` 콜백으로 초기화. OL 뒤에 z-index 0 배치, 동기화.
+- **네이버 지도**: 공식 SDK URL(`oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=ID`)을 프론트엔드에서 직접 로드. OL 뒤에 z-index 0 배치, 동기화. 카카오와 동일한 아키텍처.
+- **SDK 배경지도 공통**: OpenLayers viewport 배경을 투명 처리, SDK 맵은 pointer-events:none으로 OL 인터랙션 유지. basemap 전환 시 cancelled 플래그로 race condition 방지.
 
 ## API 엔드포인트
 - `GET /api/layers` - 레이어 목록

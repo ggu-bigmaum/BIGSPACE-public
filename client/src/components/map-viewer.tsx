@@ -57,7 +57,7 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
   }
 
   if (basemap.provider === "naver") {
-    return { source: new OSM(), error: "네이버 지도: NCP 인증 설정이 필요합니다. NCP 콘솔에서 Client ID와 Web 서비스 URL을 확인하세요." };
+    return { source: new OSM(), error: null };
   }
 
   if (basemap.provider === "kakao") {
@@ -87,6 +87,46 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
 
 function kakaoZoomFromOl(olZoom: number): number {
   return Math.max(1, Math.min(14, Math.round(21 - olZoom)));
+}
+
+function naverZoomFromOl(olZoom: number): number {
+  return Math.max(6, Math.min(21, Math.round(olZoom)));
+}
+
+let naverSdkLoadPromise: Promise<boolean> | null = null;
+
+function loadNaverSdk(): Promise<boolean> {
+  if (naverSdkLoadPromise) return naverSdkLoadPromise;
+
+  naverSdkLoadPromise = new Promise((resolve) => {
+    const naver = (window as any).naver;
+    if (naver?.maps?.Map) {
+      resolve(true);
+      return;
+    }
+
+    const ncpClientId = import.meta.env.VITE_NCP_CLIENT_ID || "ovj25o24ca";
+    const script = document.createElement("script");
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${ncpClientId}`;
+    script.onload = () => {
+      const n = (window as any).naver;
+      if (n?.maps?.Map) {
+        resolve(true);
+      } else {
+        console.error("네이버 SDK 로드 완료 but Map 생성자 없음");
+        naverSdkLoadPromise = null;
+        resolve(false);
+      }
+    };
+    script.onerror = () => {
+      console.error("네이버 지도 SDK 스크립트 로드 실패");
+      naverSdkLoadPromise = null;
+      resolve(false);
+    };
+    document.head.appendChild(script);
+  });
+
+  return naverSdkLoadPromise;
 }
 
 let kakaoSdkLoadPromise: Promise<boolean> | null = null;
@@ -270,6 +310,8 @@ export function MapViewer({
   const mapRef = useRef<HTMLDivElement>(null);
   const kakaoMapDivRef = useRef<HTMLDivElement>(null);
   const kakaoMapObjRef = useRef<any>(null);
+  const naverMapDivRef = useRef<HTMLDivElement>(null);
+  const naverMapObjRef = useRef<any>(null);
   const mapInstance = useRef<OlMap | null>(null);
   const baseTileLayerRef = useRef<TileLayer | null>(null);
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
@@ -525,26 +567,29 @@ export function MapViewer({
     if (!baseTileLayerRef.current || !activeBasemap) return;
 
     const isKakao = activeBasemap.provider === "kakao";
+    const isNaver = activeBasemap.provider === "naver";
+    const isSdkBasemap = isKakao || isNaver;
     let cancelled = false;
 
-    if (isKakao) {
+    if (kakaoMapDivRef.current) kakaoMapDivRef.current.style.display = "none";
+    if (naverMapDivRef.current) naverMapDivRef.current.style.display = "none";
+
+    if (isSdkBasemap) {
       baseTileLayerRef.current.setVisible(false);
 
-      loadKakaoSdk().then((ok) => {
+      const sdkLoader = isKakao ? loadKakaoSdk() : loadNaverSdk();
+      sdkLoader.then((ok) => {
         if (cancelled) return;
         if (!ok) {
-          setBasemapError("카카오 지도 SDK 로드에 실패했습니다. 잠시 후 다시 시도하세요.");
+          setBasemapError(isKakao
+            ? "카카오 지도 SDK 로드에 실패했습니다. 잠시 후 다시 시도하세요."
+            : "네이버 지도 SDK 로드에 실패했습니다. 잠시 후 다시 시도하세요.");
           baseTileLayerRef.current?.setVisible(true);
           baseTileLayerRef.current?.setSource(new OSM());
           return;
         }
         setBasemapError(null);
-
-        const kakao = (window as any).kakao;
-        const container = kakaoMapDivRef.current;
-        if (!container || !mapInstance.current) return;
-
-        container.style.display = "block";
+        if (!mapInstance.current) return;
 
         const olViewport = mapInstance.current.getViewport();
         if (olViewport) {
@@ -554,32 +599,61 @@ export function MapViewer({
         const view = mapInstance.current.getView();
         const center = view.getCenter();
         const olZoom = view.getZoom() ?? 11;
+        const [lon, lat] = center ? toLonLat(center) : [127.0, 37.5];
 
-        const [lon, lat] = center
-          ? toLonLat(center)
-          : [127.0, 37.5];
+        if (isKakao) {
+          const kakao = (window as any).kakao;
+          const container = kakaoMapDivRef.current;
+          if (!container) return;
+          container.style.display = "block";
 
-        if (kakaoMapObjRef.current) {
-          const kmap = kakaoMapObjRef.current;
-          kmap.setCenter(new kakao.maps.LatLng(lat, lon));
-          kmap.setLevel(kakaoZoomFromOl(olZoom));
+          if (kakaoMapObjRef.current) {
+            const kmap = kakaoMapObjRef.current;
+            kmap.setCenter(new kakao.maps.LatLng(lat, lon));
+            kmap.setLevel(kakaoZoomFromOl(olZoom));
+          } else {
+            const kmap = new kakao.maps.Map(container, {
+              center: new kakao.maps.LatLng(lat, lon),
+              level: kakaoZoomFromOl(olZoom),
+              draggable: false,
+              scrollwheel: false,
+              disableDoubleClick: true,
+              disableDoubleClickZoom: true,
+            });
+            kmap.setZoomable(false);
+            kakaoMapObjRef.current = kmap;
+          }
         } else {
-          const kmap = new kakao.maps.Map(container, {
-            center: new kakao.maps.LatLng(lat, lon),
-            level: kakaoZoomFromOl(olZoom),
-            draggable: false,
-            scrollwheel: false,
-            disableDoubleClick: true,
-            disableDoubleClickZoom: true,
-          });
-          kmap.setZoomable(false);
-          kakaoMapObjRef.current = kmap;
+          const naver = (window as any).naver;
+          const container = naverMapDivRef.current;
+          if (!container) return;
+          container.style.display = "block";
+
+          if (naverMapObjRef.current) {
+            const nmap = naverMapObjRef.current;
+            nmap.setCenter(new naver.maps.LatLng(lat, lon));
+            nmap.setZoom(naverZoomFromOl(olZoom));
+          } else {
+            const nmap = new naver.maps.Map(container, {
+              center: new naver.maps.LatLng(lat, lon),
+              zoom: naverZoomFromOl(olZoom),
+              draggable: false,
+              scrollWheel: false,
+              pinchZoom: false,
+              disableDoubleClickZoom: true,
+              disableDoubleTapZoom: true,
+              disableTwoFingerTapZoom: true,
+              keyboardShortcuts: false,
+              logoControl: true,
+              scaleControl: false,
+              mapDataControl: false,
+              zoomControl: false,
+            });
+            naverMapObjRef.current = nmap;
+          }
         }
       });
     } else {
-      if (kakaoMapDivRef.current) {
-        kakaoMapDivRef.current.style.display = "none";
-      }
       const olViewport = mapInstance.current?.getViewport();
       if (olViewport) {
         olViewport.style.background = "";
@@ -649,6 +723,34 @@ export function MapViewer({
     };
   }, [activeBasemap]);
 
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map || activeBasemap?.provider !== "naver" || !naverMapObjRef.current) return;
+
+    const naver = (window as any).naver;
+    if (!naver?.maps) return;
+
+    const nmap = naverMapObjRef.current;
+
+    const syncNaver = () => {
+      const view = map.getView();
+      const center = view.getCenter();
+      const olZoom = view.getZoom() ?? 11;
+      if (center) {
+        const [lon, lat] = toLonLat(center);
+        nmap.setCenter(new naver.maps.LatLng(lat, lon));
+      }
+      nmap.setZoom(naverZoomFromOl(olZoom));
+    };
+
+    map.getView().on("change:center", syncNaver);
+    map.getView().on("change:resolution", syncNaver);
+
+    return () => {
+      map.getView().un("change:center", syncNaver);
+      map.getView().un("change:resolution", syncNaver);
+    };
+  }, [activeBasemap]);
 
   const getZoomTier = useCallback((layer: Layer, zoom: number): "sido" | "sigungu" | "eupmyeondong" | "cluster" | "feature" => {
     if (layer.renderMode === "feature") return "feature";
@@ -1014,6 +1116,7 @@ export function MapViewer({
   return (
     <div className="relative w-full h-full">
       <div ref={kakaoMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none", pointerEvents: "none" }} data-testid="kakao-map-container" />
+      <div ref={naverMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none", pointerEvents: "none" }} data-testid="naver-map-container" />
       <div ref={mapRef} className="absolute inset-0 z-[1]" data-testid="map-container" />
 
       {basemapError && (
