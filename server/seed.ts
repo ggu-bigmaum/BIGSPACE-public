@@ -84,67 +84,7 @@ async function seedBasemaps() {
     description: "카카오 지도. developers.kakao.com에서 JavaScript 키 발급 필요. 카카오 지도 SDK는 별도 연동이 필요합니다.",
   });
 
-  await storage.createBasemap({
-    name: "CartoDB Positron",
-    provider: "carto",
-    urlTemplate: "https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-    enabled: true,
-    isDefault: false,
-    sortOrder: 5,
-    attribution: "© OpenStreetMap contributors, © CARTO",
-    maxZoom: 20,
-    description: "밝고 미니멀한 스타일. 데이터 시각화 배경에 최적. API 키 불필요.",
-  });
-
-  await storage.createBasemap({
-    name: "CartoDB Dark Matter",
-    provider: "carto",
-    urlTemplate: "https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-    enabled: true,
-    isDefault: false,
-    sortOrder: 6,
-    attribution: "© OpenStreetMap contributors, © CARTO",
-    maxZoom: 20,
-    description: "다크 테마 미니멀 스타일. 야간 모드 및 데이터 시각화에 적합. API 키 불필요.",
-  });
-
-  await storage.createBasemap({
-    name: "CartoDB Voyager",
-    provider: "carto",
-    urlTemplate: "https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-    enabled: true,
-    isDefault: false,
-    sortOrder: 7,
-    attribution: "© OpenStreetMap contributors, © CARTO",
-    maxZoom: 20,
-    description: "부드러운 색감의 중간 톤 스타일. 범용 배경지도. API 키 불필요.",
-  });
-
-  await storage.createBasemap({
-    name: "CartoDB Positron (라벨 없음)",
-    provider: "carto",
-    urlTemplate: "https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}@2x.png",
-    enabled: true,
-    isDefault: false,
-    sortOrder: 8,
-    attribution: "© OpenStreetMap contributors, © CARTO",
-    maxZoom: 20,
-    description: "라벨/도로명 없는 깔끔한 배경. 직접 라벨링이 필요한 분석에 적합. API 키 불필요.",
-  });
-
-  await storage.createBasemap({
-    name: "CartoDB Dark (라벨 없음)",
-    provider: "carto",
-    urlTemplate: "https://{a-d}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png",
-    enabled: true,
-    isDefault: false,
-    sortOrder: 9,
-    attribution: "© OpenStreetMap contributors, © CARTO",
-    maxZoom: 20,
-    description: "라벨 없는 다크 배경. 히트맵/밀도 시각화에 최적. API 키 불필요.",
-  });
-
-  console.log("Basemaps seeded: ESRI Satellite (default), OSM, VWorld, Naver, Kakao, CartoDB (5 styles)");
+  console.log("Basemaps seeded: ESRI Satellite (default), OSM, VWorld, Naver, Kakao");
 }
 
 async function seedSettings() {
