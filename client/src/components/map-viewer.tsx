@@ -533,35 +533,44 @@ export function MapViewer({
         const center = toLonLat(view.getCenter()!);
         const zoom = view.getZoom() || 11;
 
-        naverMapInstanceRef.current = new naverMaps.Map(naverMapDivRef.current, {
-          center: new naverMaps.LatLng(center[1], center[0]),
-          zoom: zoom,
-          mapTypeId: naverMaps.MapTypeId.NORMAL,
-          zoomControl: false,
-          mapDataControl: false,
-          scaleControl: false,
-          logoControl: true,
-          logoControlOptions: { position: naverMaps.Position.BOTTOM_LEFT },
-          draggable: false,
-          scrollWheel: false,
-          pinchZoom: false,
-          disableDoubleClickZoom: true,
-          disableDoubleTapZoom: true,
-          disableTwoFingerTapZoom: true,
-          keyboardShortcuts: false,
-          tileTransition: false,
-        });
+        try {
+          naverMapInstanceRef.current = new naverMaps.Map(naverMapDivRef.current, {
+            center: new naverMaps.LatLng(center[1], center[0]),
+            zoom: zoom,
+            mapTypeId: naverMaps.MapTypeId.NORMAL,
+            zoomControl: false,
+            mapDataControl: false,
+            scaleControl: false,
+            logoControl: true,
+            logoControlOptions: { position: naverMaps.Position.BOTTOM_LEFT },
+            draggable: false,
+            scrollWheel: false,
+            pinchZoom: false,
+            disableDoubleClickZoom: true,
+            disableDoubleTapZoom: true,
+            disableTwoFingerTapZoom: true,
+            keyboardShortcuts: false,
+            tileTransition: false,
+          });
+        } catch (e) {
+          console.warn("네이버 지도 초기화 실패:", e);
+          setBasemapError("네이버 지도 인증에 실패했습니다. NCP 콘솔에서 Client ID와 서비스 URL을 확인하세요.");
+          return;
+        }
       }
 
       const syncNaverView = () => {
         const nMap = naverMapInstanceRef.current;
         if (!nMap) return;
-        const naverMapsLocal = (window as any).naver.maps;
-        const view = map.getView();
-        const center = toLonLat(view.getCenter()!);
-        const zoom = Math.round(view.getZoom() || 11);
-        nMap.setCenter(new naverMapsLocal.LatLng(center[1], center[0]));
-        nMap.setZoom(zoom);
+        const naverMapsLocal = (window as any).naver?.maps;
+        if (!naverMapsLocal) return;
+        try {
+          const view = map.getView();
+          const center = toLonLat(view.getCenter()!);
+          const zoom = Math.round(view.getZoom() || 11);
+          nMap.setCenter(new naverMapsLocal.LatLng(center[1], center[0]));
+          nMap.setZoom(zoom);
+        } catch (_) {}
       };
 
       syncNaverView();
