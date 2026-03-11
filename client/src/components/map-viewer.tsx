@@ -326,7 +326,7 @@ export function MapViewer({
   const searchMarkerRef = useRef<Overlay | null>(null);
   const searchMarkerElRef = useRef<HTMLDivElement | null>(null);
   const [currentZoom, setCurrentZoom] = useState(11);
-  const [moveCounter, setMoveCounter] = useState(0);
+  const fetchLayersOnMoveRef = useRef<(() => void) | null>(null);
   const [cursorCoord, setCursorCoord] = useState<[number, number] | null>(null);
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
   const [basemapError, setBasemapError] = useState<string | null>(null);
@@ -437,7 +437,7 @@ export function MapViewer({
       const view = map.getView();
       const zoom = view.getZoom() || 11;
       setCurrentZoom(Math.round(zoom));
-      setMoveCounter(c => c + 1);
+      fetchLayersOnMoveRef.current?.();
       onZoomChange?.(zoom);
 
       const extent = view.calculateExtent(map.getSize());
@@ -900,6 +900,7 @@ export function MapViewer({
   }, [getZoomTier]);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moveDebouncerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!mapInstance.current) return;
@@ -920,6 +921,17 @@ export function MapViewer({
       }
     });
 
+    fetchLayersOnMoveRef.current = () => {
+      if (moveDebouncerRef.current) clearTimeout(moveDebouncerRef.current);
+      moveDebouncerRef.current = setTimeout(() => {
+        layerList.forEach(layer => {
+          if (layer.visible) {
+            fetchAndRenderLayer(layer);
+          }
+        });
+      }, 300);
+    };
+
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
@@ -937,7 +949,7 @@ export function MapViewer({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [layerList, currentZoom, moveCounter, fetchAndRenderLayer]);
+  }, [layerList, currentZoom, fetchAndRenderLayer]);
 
   useEffect(() => {
     if (!mapInstance.current) return;
