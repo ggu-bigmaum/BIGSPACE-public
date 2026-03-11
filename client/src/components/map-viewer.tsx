@@ -325,8 +325,10 @@ export function MapViewer({
   const overlayRef = useRef<Overlay | null>(null);
   const searchMarkerRef = useRef<Overlay | null>(null);
   const searchMarkerElRef = useRef<HTMLDivElement | null>(null);
-  const [currentZoom, setCurrentZoom] = useState(11);
-  const fetchLayersOnMoveRef = useRef<(() => void) | null>(null);
+  const [mapView, setMapView] = useState<{ zoom: number; bbox: [number, number, number, number] }>({
+    zoom: 11,
+    bbox: [126.5, 37.2, 127.5, 37.9],
+  });
   const [cursorCoord, setCursorCoord] = useState<[number, number] | null>(null);
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
   const [basemapError, setBasemapError] = useState<string | null>(null);
@@ -436,13 +438,14 @@ export function MapViewer({
     map.on("moveend", () => {
       const view = map.getView();
       const zoom = view.getZoom() || 11;
-      setCurrentZoom(Math.round(zoom));
-      fetchLayersOnMoveRef.current?.();
-      onZoomChange?.(zoom);
-
       const extent = view.calculateExtent(map.getSize());
       const bl = toLonLat([extent[0], extent[1]]);
       const tr = toLonLat([extent[2], extent[3]]);
+      setMapView({
+        zoom: Math.round(zoom),
+        bbox: [bl[0], bl[1], tr[0], tr[1]],
+      });
+      onZoomChange?.(zoom);
       onBboxChange?.([bl[0], bl[1], tr[0], tr[1]]);
     });
 
@@ -899,8 +902,7 @@ export function MapViewer({
     }
   }, [getZoomTier]);
 
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const moveDebouncerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!mapInstance.current) return;
@@ -921,35 +923,17 @@ export function MapViewer({
       }
     });
 
-    fetchLayersOnMoveRef.current = () => {
-      if (moveDebouncerRef.current) clearTimeout(moveDebouncerRef.current);
-      moveDebouncerRef.current = setTimeout(() => {
-        layerList.forEach(layer => {
-          if (layer.visible) {
-            fetchAndRenderLayer(layer);
-          }
-        });
-      }, 300);
-    };
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
+    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    fetchDebounceRef.current = setTimeout(() => {
       layerList.forEach(layer => {
-        if (layer.visible) {
-          fetchAndRenderLayer(layer);
-        }
+        if (layer.visible) fetchAndRenderLayer(layer);
       });
     }, 300);
 
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
     };
-  }, [layerList, currentZoom, fetchAndRenderLayer]);
+  }, [layerList, mapView, fetchAndRenderLayer]);
 
   useEffect(() => {
     if (!mapInstance.current) return;
@@ -1247,8 +1231,8 @@ export function MapViewer({
 
       <div className="absolute bottom-3 right-3 z-10">
         <div className="bg-black/50 backdrop-blur-sm rounded-md px-2.5 py-1 flex items-center gap-2">
-          <span className="text-[10px] font-mono text-white/70" data-testid="text-zoom-level">Z{currentZoom}</span>
-          <span className="text-[10px] font-mono text-cyan-400 font-bold" data-testid="text-scale-ratio">1:{getApproxScale(currentZoom)}</span>
+          <span className="text-[10px] font-mono text-white/70" data-testid="text-zoom-level">Z{mapView.zoom}</span>
+          <span className="text-[10px] font-mono text-cyan-400 font-bold" data-testid="text-scale-ratio">1:{getApproxScale(mapView.zoom)}</span>
           {cursorCoord && (
             <span className="text-[10px] font-mono text-white/50">
               {formatCoordinate(cursorCoord[1], "lat")}, {formatCoordinate(cursorCoord[0], "lng")}
