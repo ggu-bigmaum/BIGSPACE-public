@@ -133,6 +133,7 @@ export function MapViewer({
   const mapInstance = useRef<OlMap | null>(null);
   const baseTileLayerRef = useRef<TileLayer | null>(null);
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
+  const layerRequestVersionRef = useRef<Map<string, number>>(new Map());
   const highlightLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const radiusLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -359,9 +360,13 @@ export function MapViewer({
     const map = mapInstance.current;
     const existingLayer = vectorLayersRef.current.get(layer.id);
 
+    const version = (layerRequestVersionRef.current.get(layer.id) || 0) + 1;
+    layerRequestVersionRef.current.set(layer.id, version);
+
     if (!layer.visible) {
       if (existingLayer) {
         existingLayer.setVisible(false);
+        existingLayer.getSource()?.clear();
       }
       return;
     }
@@ -376,6 +381,7 @@ export function MapViewer({
     try {
       if (shouldUseAggregate(layer, zoom)) {
         const res = await fetch(`/api/layers/${layer.id}/aggregate?bbox=${bbox}&gridSize=20`);
+        if (layerRequestVersionRef.current.get(layer.id) !== version) return;
         const gridData = await res.json();
 
         const source = new VectorSource();
@@ -389,6 +395,8 @@ export function MapViewer({
           source.addFeature(feature);
         });
 
+        if (layerRequestVersionRef.current.get(layer.id) !== version) return;
+
         if (existingLayer) {
           existingLayer.setSource(source);
           existingLayer.setVisible(true);
@@ -401,6 +409,7 @@ export function MapViewer({
         }
       } else {
         const res = await fetch(`/api/layers/${layer.id}/features?bbox=${bbox}&limit=${layer.featureLimit}&zoom=${Math.round(zoom)}`);
+        if (layerRequestVersionRef.current.get(layer.id) !== version) return;
         const geojson = await res.json();
 
         const source = new VectorSource({
@@ -410,6 +419,8 @@ export function MapViewer({
         });
 
         const style = getLayerStyle(layer);
+
+        if (layerRequestVersionRef.current.get(layer.id) !== version) return;
 
         if (existingLayer) {
           existingLayer.setSource(source);
@@ -433,21 +444,31 @@ export function MapViewer({
   useEffect(() => {
     if (!mapInstance.current) return;
 
+    const currentLayerIds = new Set(layerList.map(l => l.id));
+    vectorLayersRef.current.forEach((vl, id) => {
+      if (!currentLayerIds.has(id)) {
+        mapInstance.current?.removeLayer(vl);
+        vectorLayersRef.current.delete(id);
+      }
+    });
+
+    layerList.forEach(layer => {
+      const existingLayer = vectorLayersRef.current.get(layer.id);
+      if (!layer.visible && existingLayer) {
+        existingLayer.setVisible(false);
+        existingLayer.getSource()?.clear();
+      }
+    });
+
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      const currentLayerIds = new Set(layerList.map(l => l.id));
-      vectorLayersRef.current.forEach((vl, id) => {
-        if (!currentLayerIds.has(id)) {
-          mapInstance.current?.removeLayer(vl);
-          vectorLayersRef.current.delete(id);
-        }
-      });
-
       layerList.forEach(layer => {
-        fetchAndRenderLayer(layer);
+        if (layer.visible) {
+          fetchAndRenderLayer(layer);
+        }
       });
     }, 300);
 
