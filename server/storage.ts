@@ -52,7 +52,7 @@ export interface IStorage {
   createAdminBoundaries(boundaries: InsertAdminBoundary[]): Promise<AdminBoundary[]>;
   deleteAdminBoundariesByLevel(level: string): Promise<number>;
   getAdminBoundaryLevels(): Promise<{ level: string; count: number }[]>;
-  getBoundaryAggregation(layerId: string, level: string, bbox: number[]): Promise<{ boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number; geometry: any }[]>;
+  getBoundaryAggregation(layerId: string, level: string, bbox: number[]): Promise<{ boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -358,7 +358,7 @@ export class DatabaseStorage implements IStorage {
     return (result.rows as any[]).map(r => ({ level: r.level, count: r.count }));
   }
 
-  async getBoundaryAggregation(layerId: string, level: string, bbox: number[]): Promise<{ boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number; geometry: any }[]> {
+  async getBoundaryAggregation(layerId: string, level: string, bbox: number[]): Promise<{ boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number }[]> {
     const [minLng, minLat, maxLng, maxLat] = bbox;
     const result = await db.execute(sql`
       SELECT
@@ -367,7 +367,6 @@ export class DatabaseStorage implements IStorage {
         ab.code,
         ab.center_lng,
         ab.center_lat,
-        ab.geometry,
         COALESCE(fc.cnt, 0)::int as count
       FROM administrative_boundaries ab
       LEFT JOIN (
@@ -379,8 +378,6 @@ export class DatabaseStorage implements IStorage {
           AND f.lat BETWEEN ab2.min_lat AND ab2.max_lat
           AND f.lng BETWEEN ab2.min_lng AND ab2.max_lng
         WHERE f.layer_id = ${layerId}
-          AND f.lat BETWEEN ${minLat} AND ${maxLat}
-          AND f.lng BETWEEN ${minLng} AND ${maxLng}
         GROUP BY ab2.id
       ) fc ON fc.bid = ab.id
       WHERE ab.level = ${level}
@@ -397,7 +394,6 @@ export class DatabaseStorage implements IStorage {
       count: r.count,
       centerLng: r.center_lng,
       centerLat: r.center_lat,
-      geometry: r.geometry,
     }));
   }
 

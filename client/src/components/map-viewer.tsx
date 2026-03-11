@@ -11,7 +11,7 @@ import GeoJSON from "ol/format/GeoJSON";
 import { fromLonLat, toLonLat, transformExtent } from "ol/proj";
 import { Style, Fill, Stroke, Circle as CircleStyle, Text as TextStyle } from "ol/style";
 import { Feature as OlFeature } from "ol";
-import { Point, Circle as CircleGeom, MultiPolygon, Polygon } from "ol/geom";
+import { Point, Circle as CircleGeom } from "ol/geom";
 import Overlay from "ol/Overlay";
 import { defaults as defaultControls } from "ol/control";
 import type { Layer, Feature, Basemap } from "@shared/schema";
@@ -140,35 +140,35 @@ function getClusterStyle(count: number) {
   });
 }
 
-function getBoundaryStyle(count: number, name: string, layer: Layer, level: string) {
+function getBoundaryCircleStyle(count: number, name: string, layer: Layer, level: string) {
+  if (count === 0) return new Style();
   const baseColor = layer.strokeColor || "#0d9488";
   const r = parseInt(baseColor.slice(1, 3), 16);
   const g = parseInt(baseColor.slice(3, 5), 16);
   const b = parseInt(baseColor.slice(5, 7), 16);
   const isSido = level === "시도";
-  const alpha = count > 0 ? Math.min(0.15 + (Math.log10(Math.max(count, 1)) / 6) * 0.4, 0.55) : 0.03;
+  const logCount = Math.log10(Math.max(count, 1));
+  const radius = isSido
+    ? Math.min(25 + logCount * 8, 55)
+    : Math.min(18 + logCount * 6, 45);
   const countText = count > 99999 ? `${(count / 1000).toFixed(0)}k` : count > 9999 ? `${(count / 1000).toFixed(1)}k` : count > 999 ? `${(count / 1000).toFixed(1)}k` : count.toString();
-  const label = isSido ? `${name}\n${countText}` : `${name}\n${countText}`;
+  const fontSize = isSido ? Math.max(11, Math.min(radius * 0.35, 16)) : Math.max(10, Math.min(radius * 0.38, 14));
 
-  return [
-    new Style({
-      fill: new Fill({ color: `rgba(${r}, ${g}, ${b}, ${alpha})` }),
-      stroke: new Stroke({
-        color: `rgba(${r}, ${g}, ${b}, 0.8)`,
-        width: isSido ? 2 : 1.5,
-      }),
+  return new Style({
+    image: new CircleStyle({
+      radius: radius,
+      fill: new Fill({ color: `rgba(${r}, ${g}, ${b}, 0.4)` }),
+      stroke: new Stroke({ color: `rgba(${r}, ${g}, ${b}, 0.9)`, width: isSido ? 2.5 : 2 }),
     }),
-    new Style({
-      text: new TextStyle({
-        text: count > 0 ? label : "",
-        fill: new Fill({ color: "#ffffff" }),
-        stroke: new Stroke({ color: `rgba(0, 0, 0, 0.7)`, width: 3 }),
-        font: `bold ${isSido ? 14 : 12}px sans-serif`,
-        overflow: true,
-        textAlign: "center",
-      }),
+    text: new TextStyle({
+      text: `${name}\n${countText}`,
+      fill: new Fill({ color: "#ffffff" }),
+      stroke: new Stroke({ color: `rgba(0, 0, 0, 0.6)`, width: 3 }),
+      font: `bold ${fontSize}px sans-serif`,
+      textAlign: "center",
+      offsetY: 0,
     }),
-  ];
+  });
 }
 
 function getApproxScale(zoom: number): string {
@@ -473,27 +473,16 @@ export function MapViewer({
         const boundaryData = await res.json();
 
         const source = new VectorSource();
-        const geojsonFormat = new GeoJSON();
-        boundaryData.forEach((b: { boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number; geometry: any }) => {
-          try {
-            const geojsonFeature = {
-              type: "Feature",
-              geometry: b.geometry,
-              properties: {},
-            };
-            const olFeatures = geojsonFormat.readFeatures(geojsonFeature, {
-              featureProjection: "EPSG:3857",
-            });
-            if (olFeatures.length > 0) {
-              const feature = olFeatures[0];
-              feature.set("count", b.count);
-              feature.set("name", b.name);
-              feature.set("boundaryId", b.boundaryId);
-              feature.setStyle(getBoundaryStyle(b.count, b.name, layer, level));
-              source.addFeature(feature);
-            }
-          } catch (e) {
-          }
+        boundaryData.forEach((b: { boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number }) => {
+          if (b.count === 0) return;
+          const feature = new OlFeature({
+            geometry: new Point(fromLonLat([b.centerLng, b.centerLat])),
+            count: b.count,
+            name: b.name,
+            boundaryId: b.boundaryId,
+          });
+          feature.setStyle(getBoundaryCircleStyle(b.count, b.name, layer, level));
+          source.addFeature(feature);
         });
 
         if (layerRequestVersionRef.current.get(layer.id) !== version) return;
