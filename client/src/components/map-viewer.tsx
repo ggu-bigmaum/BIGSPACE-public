@@ -326,6 +326,7 @@ export function MapViewer({
   const searchMarkerRef = useRef<Overlay | null>(null);
   const searchMarkerElRef = useRef<HTMLDivElement | null>(null);
   const [currentZoom, setCurrentZoom] = useState(11);
+  const [moveCounter, setMoveCounter] = useState(0);
   const [cursorCoord, setCursorCoord] = useState<[number, number] | null>(null);
   const [popupContent, setPopupContent] = useState<{ name: string; props: Record<string, any> } | null>(null);
   const [basemapError, setBasemapError] = useState<string | null>(null);
@@ -436,6 +437,7 @@ export function MapViewer({
       const view = map.getView();
       const zoom = view.getZoom() || 11;
       setCurrentZoom(Math.round(zoom));
+      setMoveCounter(c => c + 1);
       onZoomChange?.(zoom);
 
       const extent = view.calculateExtent(map.getSize());
@@ -935,7 +937,7 @@ export function MapViewer({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [layerList, currentZoom, fetchAndRenderLayer]);
+  }, [layerList, currentZoom, moveCounter, fetchAndRenderLayer]);
 
   useEffect(() => {
     if (!mapInstance.current) return;
