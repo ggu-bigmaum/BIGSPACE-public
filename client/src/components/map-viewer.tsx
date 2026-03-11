@@ -61,7 +61,7 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
   }
 
   if (basemap.provider === "kakao") {
-    return { source: new OSM(), error: "카카오 지도: SDK API 서비스(OPEN_MAP_AND_LOCAL)가 비활성화 상태입니다. Kakao Developers 콘솔에서 '지도/로컬' API를 활성화하세요. 현재 OSM으로 대체 표시됩니다." };
+    return { source: new OSM(), error: null };
   }
 
   let url = basemap.urlTemplate;
@@ -85,6 +85,44 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
   return { source: xyzSource, error: null };
 }
 
+function kakaoZoomFromOl(olZoom: number): number {
+  return Math.max(1, Math.min(14, Math.round(21 - olZoom)));
+}
+
+let kakaoSdkLoadPromise: Promise<boolean> | null = null;
+
+function loadKakaoSdk(): Promise<boolean> {
+  if (kakaoSdkLoadPromise) return kakaoSdkLoadPromise;
+
+  kakaoSdkLoadPromise = new Promise((resolve) => {
+    const kakao = (window as any).kakao;
+    if (kakao?.maps?.Map) {
+      resolve(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "/api/proxy/kakao-sdk";
+    script.onload = () => {
+      const k = (window as any).kakao;
+      if (k?.maps?.Map) {
+        resolve(true);
+      } else {
+        console.error("카카오 SDK 로드 완료 but Map 생성자 없음");
+        kakaoSdkLoadPromise = null;
+        resolve(false);
+      }
+    };
+    script.onerror = () => {
+      console.error("카카오 지도 SDK 스크립트 로드 실패");
+      kakaoSdkLoadPromise = null;
+      resolve(false);
+    };
+    document.head.appendChild(script);
+  });
+
+  return kakaoSdkLoadPromise;
+}
 
 const geojsonFormat = new GeoJSON();
 
@@ -221,6 +259,8 @@ export function MapViewer({
   searchResults: externalSearchResults,
 }: MapViewerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const kakaoMapDivRef = useRef<HTMLDivElement>(null);
+  const kakaoMapObjRef = useRef<any>(null);
   const mapInstance = useRef<OlMap | null>(null);
   const baseTileLayerRef = useRef<TileLayer | null>(null);
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
@@ -474,35 +514,126 @@ export function MapViewer({
 
   useEffect(() => {
     if (!baseTileLayerRef.current || !activeBasemap) return;
-    const { source, error } = createTileSource(activeBasemap);
-    setBasemapError(error);
-    tileErrorCountRef.current = 0;
 
-    if (source instanceof XYZ && !(source instanceof OSM)) {
-      const onTileError = () => {
-        tileErrorCountRef.current++;
-        if (tileErrorCountRef.current === 3) {
-          setBasemapError(`${activeBasemap.name}: 타일 로드 실패. URL 또는 API 키를 확인하세요.`);
+    const isKakao = activeBasemap.provider === "kakao";
+
+    if (isKakao) {
+      baseTileLayerRef.current.setVisible(false);
+
+      loadKakaoSdk().then((ok) => {
+        if (!ok) {
+          setBasemapError("카카오 지도 SDK 로드에 실패했습니다. 잠시 후 다시 시도하세요.");
+          baseTileLayerRef.current?.setVisible(true);
+          baseTileLayerRef.current?.setSource(new OSM());
+          return;
         }
-      };
-      const onTileLoad = () => {
-        if (tileErrorCountRef.current >= 3) {
-          tileErrorCountRef.current = 0;
-          setBasemapError(null);
+        setBasemapError(null);
+
+        const kakao = (window as any).kakao;
+        const container = kakaoMapDivRef.current;
+        if (!container || !mapInstance.current) return;
+
+        container.style.display = "block";
+
+        const olViewport = mapInstance.current.getViewport();
+        if (olViewport) {
+          olViewport.style.background = "transparent";
         }
-      };
-      source.on("tileloaderror", onTileError);
-      source.on("tileloadend", onTileLoad);
+
+        const view = mapInstance.current.getView();
+        const center = view.getCenter();
+        const olZoom = view.getZoom() ?? 11;
+
+        const [lon, lat] = center
+          ? toLonLat(center)
+          : [127.0, 37.5];
+
+        if (kakaoMapObjRef.current) {
+          const kmap = kakaoMapObjRef.current;
+          kmap.setCenter(new kakao.maps.LatLng(lat, lon));
+          kmap.setLevel(kakaoZoomFromOl(olZoom));
+        } else {
+          const kmap = new kakao.maps.Map(container, {
+            center: new kakao.maps.LatLng(lat, lon),
+            level: kakaoZoomFromOl(olZoom),
+            draggable: false,
+            scrollwheel: false,
+            disableDoubleClick: true,
+            disableDoubleClickZoom: true,
+          });
+          kmap.setZoomable(false);
+          kakaoMapObjRef.current = kmap;
+        }
+      });
+    } else {
+      if (kakaoMapDivRef.current) {
+        kakaoMapDivRef.current.style.display = "none";
+      }
+      const olViewport = mapInstance.current?.getViewport();
+      if (olViewport) {
+        olViewport.style.background = "";
+      }
+      baseTileLayerRef.current.setVisible(true);
+
+      const { source, error } = createTileSource(activeBasemap);
+      setBasemapError(error);
+      tileErrorCountRef.current = 0;
+
+      if (source instanceof XYZ && !(source instanceof OSM)) {
+        const onTileError = () => {
+          tileErrorCountRef.current++;
+          if (tileErrorCountRef.current === 3) {
+            setBasemapError(`${activeBasemap.name}: 타일 로드 실패. URL 또는 API 키를 확인하세요.`);
+          }
+        };
+        const onTileLoad = () => {
+          if (tileErrorCountRef.current >= 3) {
+            tileErrorCountRef.current = 0;
+            setBasemapError(null);
+          }
+        };
+        source.on("tileloaderror", onTileError);
+        source.on("tileloadend", onTileLoad);
+
+        baseTileLayerRef.current.setSource(source);
+
+        return () => {
+          source.un("tileloaderror", onTileError);
+          source.un("tileloadend", onTileLoad);
+        };
+      }
 
       baseTileLayerRef.current.setSource(source);
-
-      return () => {
-        source.un("tileloaderror", onTileError);
-        source.un("tileloadend", onTileLoad);
-      };
     }
+  }, [activeBasemap]);
 
-    baseTileLayerRef.current.setSource(source);
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map || activeBasemap?.provider !== "kakao" || !kakaoMapObjRef.current) return;
+
+    const kakao = (window as any).kakao;
+    if (!kakao?.maps) return;
+
+    const kmap = kakaoMapObjRef.current;
+
+    const syncKakao = () => {
+      const view = map.getView();
+      const center = view.getCenter();
+      const olZoom = view.getZoom() ?? 11;
+      if (center) {
+        const [lon, lat] = toLonLat(center);
+        kmap.setCenter(new kakao.maps.LatLng(lat, lon));
+      }
+      kmap.setLevel(kakaoZoomFromOl(olZoom));
+    };
+
+    map.getView().on("change:center", syncKakao);
+    map.getView().on("change:resolution", syncKakao);
+
+    return () => {
+      map.getView().un("change:center", syncKakao);
+      map.getView().un("change:resolution", syncKakao);
+    };
   }, [activeBasemap]);
 
 
@@ -869,6 +1000,7 @@ export function MapViewer({
 
   return (
     <div className="relative w-full h-full">
+      <div ref={kakaoMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none", pointerEvents: "none" }} data-testid="kakao-map-container" />
       <div ref={mapRef} className="absolute inset-0 z-[1]" data-testid="map-container" />
 
       {basemapError && (

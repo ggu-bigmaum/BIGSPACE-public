@@ -217,35 +217,32 @@ export async function registerRoutes(
     res.status(503).json({ message: "네이버 지도는 JavaScript SDK 인증이 필요합니다. NCP 콘솔에서 Web 서비스 URL 설정을 확인하세요." });
   });
 
-  app.get("/api/proxy/kakao-tiles/:z/:x/:y", async (req, res) => {
+  let kakaoSdkCache: { data: string; fetchedAt: number } | null = null;
+  app.get("/api/proxy/kakao-sdk", async (_req, res) => {
     try {
-      const z = parseInt(req.params.z);
-      const x = parseInt(req.params.x);
-      const y = parseInt(req.params.y);
-
-      if (isNaN(z) || isNaN(x) || isNaN(y)) {
-        return res.status(400).json({ message: "잘못된 타일 좌표" });
+      if (kakaoSdkCache && Date.now() - kakaoSdkCache.fetchedAt < 24 * 60 * 60 * 1000) {
+        res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+        res.setHeader("Cache-Control", "public, max-age=86400");
+        return res.send(kakaoSdkCache.data);
       }
 
-      const subdomain = (x + y) % 4;
-      const tileUrl = `https://map${subdomain}.daumcdn.net/map_2d/2111ydg/L${z}/${y}/${x}.png`;
-
-      const resp = await fetch(tileUrl, {
-        headers: {
-          "Referer": "https://map.kakao.com/",
-          "User-Agent": "Mozilla/5.0",
-        },
-      });
-      if (!resp.ok) {
-        return res.status(resp.status).send("타일 로드 실패");
+      const [loaderResp, mainResp] = await Promise.all([
+        fetch("https://spi.maps.daum.net/imap/map_js_init/v3.int.js"),
+        fetch("https://t1.daumcdn.net/mapjsapi/internal/4.4.21/v3.js"),
+      ]);
+      if (!loaderResp.ok || !mainResp.ok) {
+        return res.status(502).json({ message: "카카오 SDK 로드 실패" });
       }
-      const buffer = Buffer.from(await resp.arrayBuffer());
-      res.setHeader("Content-Type", "image/png");
+      const loaderCode = await loaderResp.text();
+      const mainCode = await mainResp.text();
+      const patchedLoader = `(function(){var _origWrite=document.write;document.write=function(){};try{\n${loaderCode}\n}finally{document.write=_origWrite;}})();\n`;
+      const combined = patchedLoader + mainCode;
+      kakaoSdkCache = { data: combined, fetchedAt: Date.now() };
+      res.setHeader("Content-Type", "text/javascript; charset=utf-8");
       res.setHeader("Cache-Control", "public, max-age=86400");
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.send(buffer);
+      res.send(combined);
     } catch (e) {
-      res.status(502).json({ message: "카카오 타일 프록시 오류" });
+      res.status(502).json({ message: "카카오 SDK 프록시 오류" });
     }
   });
 
