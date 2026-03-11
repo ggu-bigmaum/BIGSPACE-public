@@ -300,8 +300,8 @@
 .ol-scale-line {
   position: absolute !important;
   bottom: 12px !important;
-  left: 12px !important;
-  right: auto !important;
+  left: auto !important;
+  right: 12px !important;
   top: auto !important;
   background: rgba(0, 0, 0, 0.7) !important;
   backdrop-filter: blur(8px);
