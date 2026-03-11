@@ -60,6 +60,10 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
     return { source: new OSM(), error: "네이버 지도: NCP 인증 설정이 필요합니다. NCP 콘솔에서 Client ID와 Web 서비스 URL을 확인하세요." };
   }
 
+  if (basemap.provider === "kakao") {
+    return { source: new OSM(), error: null };
+  }
+
   let url = basemap.urlTemplate;
   if (!url) {
     return { source: new OSM(), error: `${basemap.name}: 타일 URL이 설정되지 않았습니다. 설정에서 URL 템플릿을 입력하세요.` };
@@ -79,6 +83,11 @@ function createTileSource(basemap: Basemap): { source: OSM | XYZ; error: string 
   });
 
   return { source: xyzSource, error: null };
+}
+
+function kakaoZoomFromOl(olZoom: number): number {
+  const level = Math.max(1, Math.min(14, Math.round(21 - olZoom)));
+  return level;
 }
 
 const geojsonFormat = new GeoJSON();
@@ -216,6 +225,9 @@ export function MapViewer({
   searchResults: externalSearchResults,
 }: MapViewerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const kakaoMapDivRef = useRef<HTMLDivElement>(null);
+  const kakaoMapInstanceRef = useRef<any>(null);
+  const kakaoSdkReadyRef = useRef(false);
   const mapInstance = useRef<OlMap | null>(null);
   const baseTileLayerRef = useRef<TileLayer | null>(null);
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
@@ -500,6 +512,131 @@ export function MapViewer({
     baseTileLayerRef.current.setSource(source);
   }, [activeBasemap]);
 
+  useEffect(() => {
+    const isKakao = activeBasemap?.provider === "kakao";
+    const kakaoDiv = kakaoMapDivRef.current;
+    const olMap = mapInstance.current;
+
+    if (!kakaoDiv || !olMap) return;
+
+    if (!isKakao) {
+      kakaoDiv.style.display = "none";
+      if (baseTileLayerRef.current) {
+        baseTileLayerRef.current.setVisible(true);
+      }
+      const olViewport = mapRef.current?.querySelector(".ol-viewport") as HTMLElement | null;
+      if (olViewport) {
+        olViewport.style.background = "";
+      }
+      return;
+    }
+
+    kakaoDiv.style.display = "block";
+    if (baseTileLayerRef.current) {
+      baseTileLayerRef.current.setVisible(false);
+    }
+    const olViewport = mapRef.current?.querySelector(".ol-viewport") as HTMLElement | null;
+    if (olViewport) {
+      olViewport.style.background = "transparent";
+    }
+
+    let disposed = false;
+
+    const initKakaoMap = () => {
+      const kakao = (window as any).kakao;
+      if (!kakao?.maps || disposed) return;
+
+      if (!kakaoSdkReadyRef.current) {
+        kakao.maps.load(() => {
+          if (disposed) return;
+          kakaoSdkReadyRef.current = true;
+          createKakaoMap();
+        });
+      } else {
+        createKakaoMap();
+      }
+    };
+
+    const createKakaoMap = () => {
+      if (disposed) return;
+      const kakao = (window as any).kakao;
+      if (!kakao?.maps?.LatLng) return;
+
+      const view = olMap.getView();
+      const center = toLonLat(view.getCenter()!);
+      const zoom = Math.round(view.getZoom()!);
+
+      if (kakaoMapInstanceRef.current) {
+        const kCenter = new kakao.maps.LatLng(center[1], center[0]);
+        kakaoMapInstanceRef.current.setCenter(kCenter);
+        kakaoMapInstanceRef.current.setLevel(kakaoZoomFromOl(zoom));
+        requestAnimationFrame(() => {
+          if (!disposed && kakaoMapInstanceRef.current) {
+            kakaoMapInstanceRef.current.relayout();
+          }
+        });
+        return;
+      }
+
+      const container = kakaoMapDivRef.current!;
+      const options = {
+        center: new kakao.maps.LatLng(center[1], center[0]),
+        level: kakaoZoomFromOl(zoom),
+        draggable: false,
+        scrollwheel: false,
+        disableDoubleClick: true,
+        disableDoubleClickZoom: true,
+      };
+      const kMap = new kakao.maps.Map(container, options);
+      kakaoMapInstanceRef.current = kMap;
+      requestAnimationFrame(() => {
+        if (!disposed && kakaoMapInstanceRef.current) {
+          kakaoMapInstanceRef.current.relayout();
+          const c = toLonLat(olMap.getView().getCenter()!);
+          kMap.setCenter(new kakao.maps.LatLng(c[1], c[0]));
+          kMap.setLevel(kakaoZoomFromOl(Math.round(olMap.getView().getZoom()!)));
+        }
+      });
+    };
+
+    initKakaoMap();
+
+    const syncKakaoView = () => {
+      if (disposed) return;
+      const kMap = kakaoMapInstanceRef.current;
+      const kakao = (window as any).kakao;
+      if (!kMap || !kakao?.maps) return;
+
+      const view = olMap.getView();
+      const center = toLonLat(view.getCenter()!);
+      const zoom = Math.round(view.getZoom()!);
+      const kCenter = new kakao.maps.LatLng(center[1], center[0]);
+      kMap.setCenter(kCenter);
+      kMap.setLevel(kakaoZoomFromOl(zoom));
+    };
+
+    const view = olMap.getView();
+    view.on("change:center", syncKakaoView);
+    view.on("change:resolution", syncKakaoView);
+
+    const handleResize = () => {
+      if (disposed) return;
+      const kMap = kakaoMapInstanceRef.current;
+      if (kMap) {
+        kMap.relayout();
+        syncKakaoView();
+      }
+    };
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (kakaoDiv) resizeObserver.observe(kakaoDiv);
+
+    return () => {
+      disposed = true;
+      view.un("change:center", syncKakaoView);
+      view.un("change:resolution", syncKakaoView);
+      resizeObserver.disconnect();
+    };
+  }, [activeBasemap]);
 
   const getZoomTier = useCallback((layer: Layer, zoom: number): "sido" | "sigungu" | "eupmyeondong" | "cluster" | "feature" => {
     if (layer.renderMode === "feature") return "feature";
@@ -864,6 +1001,7 @@ export function MapViewer({
 
   return (
     <div className="relative w-full h-full">
+      <div ref={kakaoMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none" }} data-testid="kakao-map-container" />
       <div ref={mapRef} className="absolute inset-0 z-[1]" data-testid="map-container" />
 
       {basemapError && (
