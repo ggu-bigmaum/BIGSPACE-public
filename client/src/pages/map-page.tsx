@@ -7,6 +7,7 @@ import { FeatureInfoPanel } from "@/components/feature-info-panel";
 import { SpatialAnalysisPanel } from "@/components/spatial-analysis-panel";
 import { BoxSelectPanel } from "@/components/box-select-panel";
 import { useToast } from "@/hooks/use-toast";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 interface MapPageProps {
   selectedLayerId?: string | null;
@@ -77,6 +78,11 @@ export default function MapPage({
 
   return (
     <div className="relative w-full h-full">
+      {/* 모바일 사이드바 열기 버튼 */}
+      <div className="absolute top-3 left-3 z-20 md:hidden">
+        <SidebarTrigger className="bg-background/90 backdrop-blur-sm border border-border shadow-md rounded-md h-9 w-9" />
+      </div>
+
       <MapViewer
         layers={layers}
         selectedLayerId={selectedLayerId}

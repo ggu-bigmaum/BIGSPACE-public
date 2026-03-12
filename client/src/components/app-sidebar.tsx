@@ -12,6 +12,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -398,6 +399,11 @@ export function AppSidebar({
   selectedLayerId,
 }: AppSidebarProps) {
   const { toast } = useToast();
+  const { setOpenMobile, isMobile } = useSidebar();
+
+  const closeMobileIfNeeded = () => {
+    if (isMobile) setOpenMobile(false);
+  };
   const [badgeStyle, setBadgeStyle] = useState(() => localStorage.getItem("layerBadgeStyle") || "dot");
   const [editingLayer, setEditingLayer] = useState<Layer | null>(null);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
@@ -480,7 +486,7 @@ export function AppSidebar({
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={onAnalysisOpen}
+                      onClick={() => { onAnalysisOpen?.(); closeMobileIfNeeded(); }}
                       data-testid="button-spatial-analysis"
                     >
                       <Cpu className="w-4 h-4" />
@@ -509,7 +515,7 @@ export function AppSidebar({
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5 rounded"
-                      onClick={onAddLayer}
+                      onClick={() => { onAddLayer?.(); closeMobileIfNeeded(); }}
                       data-testid="button-add-layer-sidebar"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -568,7 +574,7 @@ export function AppSidebar({
                             <SidebarMenuItem key={layer.id}>
                               <div
                                 className={`group flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors ${isSelected ? "bg-accent" : "hover-elevate"}`}
-                                onClick={() => onLayerSelect?.(isSelected ? null : layer.id)}
+                                onClick={() => { onLayerSelect?.(isSelected ? null : layer.id); closeMobileIfNeeded(); }}
                                 data-testid={`button-select-layer-${layer.id}`}
                               >
                                 <Switch
@@ -740,7 +746,7 @@ export function AppSidebar({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={onSettingsOpen}
+                  onClick={() => { onSettingsOpen?.(); closeMobileIfNeeded(); }}
                   data-testid="button-open-settings"
                 >
                   <Settings2 className="w-4 h-4" />
