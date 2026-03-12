@@ -339,6 +339,19 @@ export function MapViewer({
   const [basemapPickerOpen, setBasemapPickerOpen] = useState(false);
   const [mapToolMode, setMapToolMode] = useState<"select" | "boxSelect">("select");
   const tileErrorCountRef = useRef(0);
+  const basemapPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!basemapPickerOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (basemapPickerRef.current && !basemapPickerRef.current.contains(e.target as Node)) {
+        setBasemapPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [basemapPickerOpen]);
+
   const prevVisibleIdsRef = useRef<Set<string>>(new Set());
 
   const { data: basemapList = [] } = useQuery<Basemap[]>({
@@ -1150,8 +1163,8 @@ export function MapViewer({
       )}
 
       <div className="absolute top-3 z-10 left-3 w-[calc(100%-100px)] md:left-1/2 md:w-full md:max-w-md md:px-4 md:-translate-x-1/2">
-        <form onSubmit={(e) => { e.preventDefault(); handleSearchGo(); }} className="flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-md border border-white/10 px-2">
-          <Search className="w-4 h-4 text-white/60 flex-shrink-0" />
+        <form onSubmit={(e) => { e.preventDefault(); handleSearchGo(); }} className="flex items-center gap-1 h-8 bg-black/60 backdrop-blur-md rounded-md border border-white/10 px-2">
+          <Search className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
           <Input
             type="text"
             placeholder="주소, 지명 또는 좌표 검색..."
@@ -1164,22 +1177,22 @@ export function MapViewer({
               }
             }}
             onFocus={() => { if (geocodeResults.length > 0) setShowSearchResults(true); }}
-            className="border-0 bg-transparent text-white placeholder:text-white/40 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="border-0 bg-transparent text-white placeholder:text-white/40 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 h-full py-0"
             data-testid="input-map-search"
           />
           {searchLoading ? (
-            <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+            <div className="w-7 h-7 flex items-center justify-center flex-shrink-0">
+              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
             </div>
           ) : (
             <Button
               size="icon"
               variant="ghost"
               type="submit"
-              className="text-white/60 hover:text-white flex-shrink-0"
+              className="text-white/60 hover:text-white flex-shrink-0 w-7 h-7"
               data-testid="button-map-pin"
             >
-              <MapPin className="w-4 h-4" />
+              <MapPin className="w-3.5 h-3.5" />
             </Button>
           )}
         </form>
@@ -1237,7 +1250,7 @@ export function MapViewer({
       </div>
 
       <div className="absolute bottom-3 right-3 z-10">
-        <div className="bg-black/50 backdrop-blur-sm rounded-md px-2.5 py-1 flex items-center gap-2">
+        <div className="bg-black/50 backdrop-blur-sm rounded-md border border-white/10 px-2.5 py-1 flex items-center gap-2">
           <span className="text-[10px] font-mono text-white/70" data-testid="text-zoom-level">Z{mapView.zoom}</span>
           <span className="text-[10px] font-mono text-cyan-400 font-bold" data-testid="text-scale-ratio">1:{getApproxScale(mapView.zoom)}</span>
           {cursorCoord && (
@@ -1270,7 +1283,7 @@ export function MapViewer({
       </div>
 
       <div className="absolute bottom-3 left-3 z-10">
-        <div className="relative">
+        <div className="relative" ref={basemapPickerRef}>
           <button
             onClick={() => setBasemapPickerOpen(!basemapPickerOpen)}
             className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm text-white/70 hover:text-white border border-white/10 text-[10px] px-2.5 py-1 rounded-md font-normal transition-colors"
