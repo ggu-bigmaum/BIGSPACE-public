@@ -923,6 +923,8 @@ export function MapViewer({
     layerList.forEach(layer => {
       const existingLayer = vectorLayersRef.current.get(layer.id);
       if (!layer.visible && existingLayer) {
+        const v = (layerRequestVersionRef.current.get(layer.id) || 0) + 1;
+        layerRequestVersionRef.current.set(layer.id, v);
         existingLayer.setVisible(false);
         existingLayer.getSource()?.clear();
       }
