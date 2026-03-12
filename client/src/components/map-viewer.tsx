@@ -341,17 +341,6 @@ export function MapViewer({
   const tileErrorCountRef = useRef(0);
   const basemapPickerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!basemapPickerOpen) return;
-    const handleOutside = (e: MouseEvent) => {
-      if (basemapPickerRef.current && !basemapPickerRef.current.contains(e.target as Node)) {
-        setBasemapPickerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [basemapPickerOpen]);
-
   const prevVisibleIdsRef = useRef<Set<string>>(new Set());
 
   const { data: basemapList = [] } = useQuery<Basemap[]>({
@@ -1145,7 +1134,14 @@ export function MapViewer({
   }, [moveToLocation]);
 
   return (
-    <div className="relative w-full h-full">
+    <div
+      className="relative w-full h-full"
+      onClick={(e) => {
+        if (basemapPickerOpen && basemapPickerRef.current && !basemapPickerRef.current.contains(e.target as Node)) {
+          setBasemapPickerOpen(false);
+        }
+      }}
+    >
       <div ref={kakaoMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none", pointerEvents: "none" }} data-testid="kakao-map-container" />
       <div ref={naverMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none", pointerEvents: "none" }} data-testid="naver-map-container" />
       <div ref={mapRef} className="absolute inset-0 z-[1]" data-testid="map-container" />
