@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertLayerSchema, insertFeatureSchema, insertBasemapSchema, insertAppSettingSchema } from "@shared/schema";
 import type { InsertAdminBoundary } from "@shared/schema";
 import { z } from "zod";
+import { pool } from "./db";
 import multer from "multer";
 import proj4 from "proj4";
 import * as fs from "fs";
@@ -515,6 +516,85 @@ export async function registerRoutes(
       layers: allLayers.map(l => ({ id: l.id, name: l.name, featureCount: l.featureCount })),
     });
   });
+
+  // ── 일회성 데이터 마이그레이션 엔드포인트 ───────────────────────────────
+  const MIGRATE_TOKEN = "5ccade24-da86-45e8-bc19-59ddafaf3556";
+
+  // 피처 배치 임포트
+  app.post("/api/admin/import-features", async (req, res) => {
+    if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { layerId, rows } = req.body as {
+      layerId: string;
+      rows: Array<{
+        geometry: any; properties: any;
+        lng?: number; lat?: number;
+        minLng?: number; minLat?: number; maxLng?: number; maxLat?: number;
+      }>;
+    };
+    if (!layerId || !Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: "layerId 및 rows[] 필요" });
+    }
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const CHUNK = 500;
+        let inserted = 0;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const chunk = rows.slice(i, i + CHUNK);
+          const params: any[] = [];
+          const placeholders = chunk.map((r, j) => {
+            const base = j * 9;
+            params.push(
+              layerId,
+              JSON.stringify(r.geometry),
+              JSON.stringify(r.properties),
+              r.lng ?? null, r.lat ?? null,
+              r.minLng ?? null, r.minLat ?? null,
+              r.maxLng ?? null, r.maxLat ?? null
+            );
+            return `(gen_random_uuid(),$${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9})`;
+          });
+          await client.query(
+            `INSERT INTO features (id,layer_id,geometry,properties,lng,lat,min_lng,min_lat,max_lng,max_lat)
+             VALUES ${placeholders.join(",")}
+             ON CONFLICT (id) DO NOTHING`,
+            params
+          );
+          inserted += chunk.length;
+        }
+        await client.query("COMMIT");
+        res.json({ inserted });
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
+    } catch (e: any) {
+      console.error("import-features error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // 레이어 통계 재계산
+  app.post("/api/admin/sync-layer-stats", async (req, res) => {
+    if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { layerIds } = req.body as { layerIds: string[] };
+    if (!Array.isArray(layerIds)) return res.status(400).json({ error: "layerIds[] 필요" });
+    const results: { layerId: string; count: number }[] = [];
+    for (const layerId of layerIds) {
+      await storage.refreshLayerStats(layerId);
+      const count = await storage.getFeatureCount(layerId);
+      results.push({ layerId, count });
+    }
+    res.json({ results });
+  });
+  // ─────────────────────────────────────────────────────────────────────────
 
   return httpServer;
 }

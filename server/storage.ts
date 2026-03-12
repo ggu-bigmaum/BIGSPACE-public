@@ -30,6 +30,7 @@ export interface IStorage {
   deleteFeature(id: string): Promise<boolean>;
   deleteFeaturesByLayer(layerId: string): Promise<number>;
   getFeatureCount(layerId: string): Promise<number>;
+  refreshLayerStats(layerId: string): Promise<void>;
 
   getFeaturesInRadius(lng: number, lat: number, radiusKm: number, layerIds?: string[]): Promise<Feature[]>;
   getFeaturesInBbox(layerId: string, bbox: number[], limit: number): Promise<{ count: number; features: { id: string; lng: number; lat: number; properties: any }[] }>;
@@ -120,7 +121,7 @@ export class DatabaseStorage implements IStorage {
   async createFeature(feature: InsertFeature): Promise<Feature> {
     const enriched = this.enrichFeatureCoords(feature);
     const [created] = await db.insert(features).values(enriched).returning();
-    await this.updateLayerStats(feature.layerId);
+    await this.refreshLayerStats(feature.layerId);
     return created;
   }
 
@@ -135,7 +136,7 @@ export class DatabaseStorage implements IStorage {
       results.push(...created);
     }
     if (featureList.length > 0) {
-      await this.updateLayerStats(featureList[0].layerId);
+      await this.refreshLayerStats(featureList[0].layerId);
     }
     return results;
   }
@@ -144,14 +145,14 @@ export class DatabaseStorage implements IStorage {
     const feature = await this.getFeature(id);
     const result = await db.delete(features).where(eq(features.id, id)).returning();
     if (result.length > 0 && feature) {
-      await this.updateLayerStats(feature.layerId);
+      await this.refreshLayerStats(feature.layerId);
     }
     return result.length > 0;
   }
 
   async deleteFeaturesByLayer(layerId: string): Promise<number> {
     const result = await db.delete(features).where(eq(features.layerId, layerId)).returning();
-    await this.updateLayerStats(layerId);
+    await this.refreshLayerStats(layerId);
     return result.length;
   }
 
@@ -466,7 +467,7 @@ export class DatabaseStorage implements IStorage {
       .filter(r => r.centerLng <= maxLng && r.centerLng >= minLng && r.centerLat <= maxLat && r.centerLat >= minLat);
   }
 
-  private async updateLayerStats(layerId: string): Promise<void> {
+  async refreshLayerStats(layerId: string): Promise<void> {
     const count = await this.getFeatureCount(layerId);
     const boundsResult = await db.execute(sql`
       SELECT
