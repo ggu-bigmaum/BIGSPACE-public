@@ -1149,7 +1149,7 @@ export function MapViewer({
         </div>
       )}
 
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4">
+      <div className="absolute top-3 z-10 left-3 w-[calc(100%-100px)] md:left-1/2 md:w-full md:max-w-md md:px-4 md:-translate-x-1/2">
         <form onSubmit={(e) => { e.preventDefault(); handleSearchGo(); }} className="flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-md border border-white/10 px-2">
           <Search className="w-4 h-4 text-white/60 flex-shrink-0" />
           <Input
@@ -1271,15 +1271,14 @@ export function MapViewer({
 
       <div className="absolute bottom-3 left-3 z-10">
         <div className="relative">
-          <Button
-            variant="ghost"
+          <button
             onClick={() => setBasemapPickerOpen(!basemapPickerOpen)}
-            className="bg-black/50 backdrop-blur-sm text-white/70 hover:text-white border border-white/10 text-[10px] px-2.5 py-1 h-auto gap-1.5 rounded-md font-normal"
+            className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm text-white/70 hover:text-white border border-white/10 text-[10px] px-2.5 py-1 rounded-md font-normal transition-colors"
             data-testid="button-basemap-picker"
           >
             <Layers className="w-3 h-3" />
             {activeBasemap?.name || "배경지도"}
-          </Button>
+          </button>
           {basemapPickerOpen && enabledBasemaps.length > 0 && (
             <div className="absolute bottom-full left-0 mb-1 bg-black/80 backdrop-blur-md rounded-md border border-white/10 py-1 min-w-[160px]">
               {enabledBasemaps.map((bm) => (
