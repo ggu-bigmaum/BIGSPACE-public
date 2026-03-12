@@ -31,6 +31,7 @@ function MapLayout() {
           onLayerSelect={setSelectedLayerId}
           onSettingsOpen={() => setSettingsOpen(true)}
           onAnalysisOpen={() => setAnalysisOpen(true)}
+          onAddLayer={() => setAddLayerDialogOpen(true)}
           selectedLayerId={selectedLayerId}
         />
         <main className="flex-1 min-w-0 overflow-hidden relative">
@@ -42,7 +43,7 @@ function MapLayout() {
         </main>
       </div>
       <AddLayerDialog open={addLayerDialogOpen} onOpenChange={setAddLayerDialogOpen} />
-      <SettingsPopup open={settingsOpen} onClose={() => setSettingsOpen(false)} onAddLayer={() => { setSettingsOpen(false); setAddLayerDialogOpen(true); }} />
+      <SettingsPopup open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </SidebarProvider>
   );
 }

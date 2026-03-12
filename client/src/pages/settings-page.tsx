@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Basemap, AppSetting, Layer } from "@shared/schema";
+import type { Basemap, AppSetting } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,20 +25,16 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/components/theme-provider";
-import { LAYER_PALETTE } from "@/lib/colorPalette";
-import { Check } from "lucide-react";
 
-type SettingsSection = "general" | "layers" | "basemaps" | "rendering" | "map" | "admin-boundaries" | "ml-server" | "products" | "architecture";
+type SettingsSection = "general" | "basemaps" | "rendering" | "map" | "admin-boundaries" | "ml-server" | "products" | "architecture";
 
 interface SettingsPopupProps {
   open: boolean;
   onClose: () => void;
-  onAddLayer?: () => void;
 }
 
 const NAV_ITEMS: { id: SettingsSection; label: string; icon: typeof Settings2 }[] = [
   { id: "general", label: "일반 설정", icon: Settings2 },
-  { id: "layers", label: "레이어 관리", icon: Layers },
   { id: "basemaps", label: "배경 지도 관리", icon: Globe },
   { id: "rendering", label: "대용량 렌더링 설정", icon: Gauge },
   { id: "map", label: "지도 기본 설정", icon: Map },
@@ -275,7 +271,7 @@ function SettingRow({ setting, onUpdate }: {
   );
 }
 
-export default function SettingsPopup({ open, onClose, onAddLayer }: SettingsPopupProps) {
+export default function SettingsPopup({ open, onClose }: SettingsPopupProps) {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
@@ -297,36 +293,12 @@ export default function SettingsPopup({ open, onClose, onAddLayer }: SettingsPop
     }
   }, [open, onClose]);
 
-  const { data: layerList = [] } = useQuery<Layer[]>({
-    queryKey: ["/api/layers"],
-  });
-
   const { data: basemapList = [] } = useQuery<Basemap[]>({
     queryKey: ["/api/basemaps"],
   });
 
   const { data: settingsList = [] } = useQuery<AppSetting[]>({
     queryKey: ["/api/settings"],
-  });
-
-  const updateLayerMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Layer> }) => {
-      await apiRequest("PATCH", `/api/layers/${id}`, updates);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/layers"] });
-      toast({ title: "레이어 설정이 저장되었습니다" });
-    },
-  });
-
-  const deleteLayerMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/layers/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/layers"] });
-      toast({ title: "레이어가 삭제되었습니다" });
-    },
   });
 
   const updateBasemapMutation = useMutation({
@@ -394,15 +366,6 @@ export default function SettingsPopup({ open, onClose, onAddLayer }: SettingsPop
     switch (activeSection) {
       case "general":
         return <GeneralSection theme={theme} setTheme={setTheme} />;
-      case "layers":
-        return (
-          <LayersSection
-            layers={layerList}
-            onUpdate={(id, updates) => updateLayerMutation.mutate({ id, updates })}
-            onDelete={(id) => deleteLayerMutation.mutate(id)}
-            onAddLayer={onAddLayer}
-          />
-        );
       case "basemaps":
         return (
           <BasemapsSection
@@ -873,427 +836,6 @@ function MapSection({ settings, onUpdate }: { settings: AppSetting[]; onUpdate: 
       ))}
       {settings.length === 0 && (
         <p className="text-sm text-muted-foreground py-8 text-center">설정이 아직 로드되지 않았습니다.</p>
-      )}
-    </div>
-  );
-}
-
-function LayerCard({ layer, onUpdate, onDelete }: {
-  layer: Layer;
-  onUpdate: (id: string, updates: Partial<Layer>) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [draft, setDraft] = useState<Partial<Layer>>({});
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const merged = { ...layer, ...draft };
-
-  const debouncedUpdate = useCallback((field: string, value: any) => {
-    setDraft(prev => ({ ...prev, [field]: value }));
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      setDraft(prev => {
-        const updates = { ...prev, [field]: value };
-        onUpdate(layer.id, updates);
-        return {};
-      });
-    }, 600);
-  }, [layer.id, onUpdate]);
-
-  useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, []);
-
-  const safeFloat = (val: string, fallback: number) => {
-    const n = parseFloat(val);
-    return isFinite(n) ? n : fallback;
-  };
-
-  const safeInt = (val: string, fallback: number) => {
-    const n = parseInt(val);
-    return isFinite(n) ? n : fallback;
-  };
-
-  const geometryLabels: Record<string, string> = {
-    Point: "포인트",
-    LineString: "라인",
-    Polygon: "폴리곤",
-    MultiPoint: "멀티포인트",
-    MultiLineString: "멀티라인",
-    MultiPolygon: "멀티폴리곤",
-  };
-
-  const renderModeLabels: Record<string, string> = {
-    auto: "자동",
-    feature: "피처",
-    tile: "타일",
-    aggregate: "집계",
-  };
-
-  return (
-    <div className="border rounded-lg p-3 space-y-3" data-testid={`layer-card-${layer.id}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-md border flex items-center justify-center"
-            style={{ backgroundColor: merged.fillColor, borderColor: merged.strokeColor }}
-          >
-            <Layers className="w-4 h-4" style={{ color: merged.strokeColor }} />
-          </div>
-          <div>
-            <div className="text-sm font-medium">{layer.name}</div>
-            <div className="flex items-center gap-2 mt-0.5">
-              <Badge variant="outline" className="text-[9px]">
-                {geometryLabels[layer.geometryType] || layer.geometryType}
-              </Badge>
-              <span className="text-[10px] text-muted-foreground">
-                피처 {layer.featureCount.toLocaleString()}개
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0"
-            onClick={() => onUpdate(layer.id, { visible: !layer.visible })}
-            data-testid={`button-toggle-visibility-${layer.id}`}
-          >
-            {layer.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
-          </Button>
-        </div>
-      </div>
-
-      {layer.description && (
-        <p className="text-xs text-muted-foreground">{layer.description}</p>
-      )}
-
-      <div className="grid grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-3">
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">카테고리</Label>
-          <Input
-            value={merged.category ?? layer.category}
-            onChange={(e) => debouncedUpdate("category", e.target.value || "일반")}
-            className="h-8 text-xs"
-            placeholder="카테고리 입력"
-            data-testid={`input-category-${layer.id}`}
-          />
-        </div>
-
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">렌더링 모드</Label>
-          <Select
-            value={merged.renderMode}
-            onValueChange={(v) => onUpdate(layer.id, { renderMode: v })}
-          >
-            <SelectTrigger className="h-8 text-xs" data-testid={`select-render-mode-${layer.id}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(renderModeLabels).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">불투명도</Label>
-          <div className="flex items-center gap-2">
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={merged.opacity}
-              onChange={(e) => debouncedUpdate("opacity", safeFloat(e.target.value, layer.opacity))}
-              className="flex-1 h-2 accent-primary"
-              data-testid={`range-opacity-${layer.id}`}
-            />
-            <span className="text-[10px] text-muted-foreground w-8 text-right">
-              {Math.round((merged.opacity ?? layer.opacity) * 100)}%
-            </span>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label className="text-[11px] text-muted-foreground">색상 프리셋</Label>
-          <div className="flex flex-wrap gap-1" data-testid={`palette-swatches-${layer.id}`}>
-            {LAYER_PALETTE.map((color) => (
-              <button
-                key={color.strokeColor}
-                type="button"
-                onClick={() => {
-                  debouncedUpdate("strokeColor", color.strokeColor);
-                  debouncedUpdate("fillColor", color.fillColor);
-                }}
-                className={`w-5 h-5 rounded border-2 transition-all flex items-center justify-center ${
-                  merged.strokeColor === color.strokeColor
-                    ? "border-foreground scale-110"
-                    : "border-transparent hover:border-muted-foreground/30 hover:scale-105"
-                }`}
-                style={{ backgroundColor: color.strokeColor }}
-                title={color.label}
-                data-testid={`palette-${layer.id}-${color.label}`}
-              >
-                {merged.strokeColor === color.strokeColor && (
-                  <Check className="w-2.5 h-2.5 text-white" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">선 색상</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={merged.strokeColor}
-                onChange={(e) => debouncedUpdate("strokeColor", e.target.value)}
-                className="w-7 h-7 rounded border cursor-pointer"
-                data-testid={`color-stroke-${layer.id}`}
-              />
-              <span className="text-[10px] font-mono text-muted-foreground">{merged.strokeColor}</span>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">채우기 색상</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={(merged.fillColor ?? "").substring(0, 7)}
-                onChange={(e) => debouncedUpdate("fillColor", e.target.value + "50")}
-                className="w-7 h-7 rounded border cursor-pointer"
-                data-testid={`color-fill-${layer.id}`}
-              />
-              <span className="text-[10px] font-mono text-muted-foreground">{merged.fillColor}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">선 두께</Label>
-          <Input
-            type="number"
-            min="0.5"
-            max="10"
-            step="0.5"
-            value={merged.strokeWidth}
-            onChange={(e) => debouncedUpdate("strokeWidth", safeFloat(e.target.value, layer.strokeWidth))}
-            className="h-8 text-xs"
-            data-testid={`input-stroke-width-${layer.id}`}
-          />
-        </div>
-
-        {layer.geometryType === "Point" && (
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">포인트 반경</Label>
-            <Input
-              type="number"
-              min="1"
-              max="20"
-              step="1"
-              value={merged.pointRadius}
-              onChange={(e) => debouncedUpdate("pointRadius", safeFloat(e.target.value, layer.pointRadius))}
-              className="h-8 text-xs"
-              data-testid={`input-point-radius-${layer.id}`}
-            />
-          </div>
-        )}
-
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">피처 제한 수</Label>
-          <Input
-            type="number"
-            min="100"
-            max="50000"
-            step="100"
-            value={merged.featureLimit}
-            onChange={(e) => debouncedUpdate("featureLimit", safeInt(e.target.value, layer.featureLimit))}
-            className="h-8 text-xs"
-            data-testid={`input-feature-limit-${layer.id}`}
-          />
-        </div>
-
-        <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">피처 표시 최소 줌</Label>
-          <Input
-            type="number"
-            min="0"
-            max="22"
-            step="1"
-            value={merged.minZoomForFeatures}
-            onChange={(e) => debouncedUpdate("minZoomForFeatures", safeInt(e.target.value, layer.minZoomForFeatures))}
-            className="h-8 text-xs"
-            data-testid={`input-min-zoom-${layer.id}`}
-          />
-        </div>
-
-        {layer.geometryType === "Point" && (
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">대단위 집계 최소 줌</Label>
-            <Input
-              type="number"
-              min="0"
-              max="22"
-              step="1"
-              value={merged.minZoomForClusters}
-              onChange={(e) => debouncedUpdate("minZoomForClusters", safeInt(e.target.value, layer.minZoomForClusters))}
-              className="h-8 text-xs"
-              data-testid={`input-min-zoom-clusters-${layer.id}`}
-            />
-          </div>
-        )}
-      </div>
-
-      <Separator />
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={merged.tileEnabled}
-              onCheckedChange={(v) => onUpdate(layer.id, { tileEnabled: v })}
-              className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
-              data-testid={`switch-tile-enabled-${layer.id}`}
-            />
-            <Label className="text-xs">타일 캐싱</Label>
-          </div>
-          {merged.tileEnabled && (
-            <div className="flex items-center gap-1">
-              <Label className="text-[10px] text-muted-foreground">최대 줌:</Label>
-              <Input
-                type="number"
-                min="0"
-                max="22"
-                value={merged.tileMaxZoom}
-                onChange={(e) => debouncedUpdate("tileMaxZoom", safeInt(e.target.value, layer.tileMaxZoom))}
-                className="h-6 text-[10px] w-14"
-                data-testid={`input-tile-max-zoom-${layer.id}`}
-              />
-            </div>
-          )}
-        </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 text-[11px] text-destructive hover:text-destructive"
-          onClick={() => onDelete(layer.id)}
-          data-testid={`button-delete-layer-${layer.id}`}
-        >
-          <Trash2 className="w-3 h-3 mr-1" /> 삭제
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function LayersSection({ layers, onUpdate, onDelete, onAddLayer }: {
-  layers: Layer[];
-  onUpdate: (id: string, updates: Partial<Layer>) => void;
-  onDelete: (id: string) => void;
-  onAddLayer?: () => void;
-}) {
-  const grouped = layers.reduce<Record<string, Layer[]>>((acc, layer) => {
-    const cat = layer.category || "일반";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(layer);
-    return acc;
-  }, {});
-  const categories = Object.keys(grouped);
-  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    categories.forEach(c => { init[c] = true; });
-    return init;
-  });
-
-  const toggleCat = (cat: string) => {
-    setExpandedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
-  };
-
-  const allExpanded = categories.every(c => expandedCats[c] !== false);
-  const toggleAll = () => {
-    const next: Record<string, boolean> = {};
-    categories.forEach(c => { next[c] = !allExpanded; });
-    setExpandedCats(next);
-  };
-
-  return (
-    <div className="space-y-4" data-testid="section-layers">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Layers className="w-4 h-4 text-primary" />
-            레이어 관리
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            총 {layers.length}개 레이어, {categories.length}개 카테고리
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {categories.length > 1 && (
-            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={toggleAll} data-testid="button-toggle-all-categories">
-              {allExpanded ? "모두 접기" : "모두 펼치기"}
-            </Button>
-          )}
-          {onAddLayer && (
-            <Button variant="outline" size="sm" className="text-xs h-7" onClick={onAddLayer} data-testid="button-add-layer">
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              레이어 추가
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <Separator />
-
-      {layers.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Layers className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">등록된 레이어가 없습니다.</p>
-          <p className="text-xs mt-1">위 "레이어 추가" 버튼으로 새 레이어를 추가할 수 있습니다.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {categories.map((cat) => {
-            const isExpanded = expandedCats[cat] !== false;
-            return (
-              <div key={cat} className="border rounded-lg overflow-hidden" data-testid={`layer-category-${cat}`}>
-                <button
-                  className="w-full flex items-center justify-between px-3 py-2 bg-muted/40 hover:bg-muted/70 transition-colors text-left"
-                  onClick={() => toggleCat(cat)}
-                  data-testid={`button-toggle-category-${cat}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold">{cat}</span>
-                    <span className="text-[10px] text-muted-foreground">{grouped[cat].length}개</span>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                  )}
-                </button>
-                {isExpanded && (
-                  <div className="p-3 space-y-3">
-                    {grouped[cat].map((layer) => (
-                      <LayerCard
-                        key={layer.id}
-                        layer={layer}
-                        onUpdate={onUpdate}
-                        onDelete={onDelete}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       )}
     </div>
   );
