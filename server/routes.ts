@@ -520,7 +520,7 @@ export async function registerRoutes(
   // ── 일회성 데이터 마이그레이션 엔드포인트 ───────────────────────────────
   const MIGRATE_TOKEN = "5ccade24-da86-45e8-bc19-59ddafaf3556";
 
-  // 피처 배치 임포트
+  // 피처 배치 임포트 (id 제공 시 그대로 사용 → 멱등성 보장)
   app.post("/api/admin/import-features", async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
@@ -528,6 +528,7 @@ export async function registerRoutes(
     const { layerId, rows } = req.body as {
       layerId: string;
       rows: Array<{
+        id?: string;
         geometry: any; properties: any;
         lng?: number; lat?: number;
         minLng?: number; minLat?: number; maxLng?: number; maxLat?: number;
@@ -546,8 +547,9 @@ export async function registerRoutes(
           const chunk = rows.slice(i, i + CHUNK);
           const params: any[] = [];
           const placeholders = chunk.map((r, j) => {
-            const base = j * 9;
+            const base = j * 10;
             params.push(
+              r.id ?? null,
               layerId,
               JSON.stringify(r.geometry),
               JSON.stringify(r.properties),
@@ -555,7 +557,7 @@ export async function registerRoutes(
               r.minLng ?? null, r.minLat ?? null,
               r.maxLng ?? null, r.maxLat ?? null
             );
-            return `(gen_random_uuid(),$${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9})`;
+            return `(COALESCE($${base+1}::varchar, gen_random_uuid()::varchar),$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9},$${base+10})`;
           });
           await client.query(
             `INSERT INTO features (id,layer_id,geometry,properties,lng,lat,min_lng,min_lat,max_lng,max_lat)
@@ -576,6 +578,50 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error("import-features error:", e);
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // 레이어 피처 전체 삭제 (재마이그레이션 전 정리용)
+  app.post("/api/admin/clear-layer", async (req, res) => {
+    if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { layerId } = req.body as { layerId: string };
+    if (!layerId) return res.status(400).json({ error: "layerId 필요" });
+    try {
+      const result = await pool.query("DELETE FROM features WHERE layer_id=$1", [layerId]);
+      await storage.refreshLayerStats(layerId);
+      res.json({ deleted: result.rowCount });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // 공간인덱스 생성
+  app.post("/api/admin/create-indexes", async (req, res) => {
+    if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const client = await pool.connect();
+    try {
+      const indexes = [
+        { name: "idx_features_layer_lat_lng", sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_features_layer_lat_lng ON features (layer_id, lat, lng)" },
+        { name: "idx_features_bbox", sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_features_bbox ON features (min_lat, max_lat, min_lng, max_lng)" },
+        { name: "idx_features_lat_lng", sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_features_lat_lng ON features (lat, lng)" },
+        { name: "idx_admin_bounds", sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_admin_bounds ON administrative_boundaries (level, min_lat, max_lat, min_lng, max_lng)" },
+      ];
+      const created: string[] = [];
+      for (const idx of indexes) {
+        await client.query(idx.sql);
+        created.push(idx.name);
+        console.log(`[index] created: ${idx.name}`);
+      }
+      res.json({ indexes: created });
+    } catch (e: any) {
+      console.error("create-indexes error:", e);
+      res.status(500).json({ error: e.message });
+    } finally {
+      client.release();
     }
   });
 
