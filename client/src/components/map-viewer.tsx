@@ -1272,13 +1272,12 @@ export function MapViewer({
       <div className="absolute bottom-3 left-3 z-10">
         <div className="relative">
           <Button
-            size="sm"
             variant="ghost"
             onClick={() => setBasemapPickerOpen(!basemapPickerOpen)}
-            className="bg-black/60 backdrop-blur-sm text-white/80 hover:text-white border border-white/10 text-xs gap-1.5"
+            className="bg-black/50 backdrop-blur-sm text-white/70 hover:text-white border border-white/10 text-[10px] px-2.5 py-1 h-auto gap-1.5 rounded-md font-normal"
             data-testid="button-basemap-picker"
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-3 h-3" />
             {activeBasemap?.name || "배경지도"}
           </Button>
           {basemapPickerOpen && enabledBasemaps.length > 0 && (

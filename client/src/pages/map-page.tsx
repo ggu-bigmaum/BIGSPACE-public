@@ -78,9 +78,9 @@ export default function MapPage({
 
   return (
     <div className="relative w-full h-full">
-      {/* 모바일 사이드바 열기 버튼 */}
-      <div className="absolute top-3 left-3 z-[1000] md:hidden">
-        <SidebarTrigger className="bg-background/90 backdrop-blur-sm border border-border shadow-md rounded-md h-9 w-9" />
+      {/* 모바일 사이드바 열기 버튼 - 검색창 아래 */}
+      <div className="absolute top-[56px] left-3 z-[1000] md:hidden">
+        <SidebarTrigger className="bg-black/60 backdrop-blur-sm border border-white/10 text-white/80 hover:text-white shadow-md rounded-md h-8 w-8" />
       </div>
 
       <MapViewer
