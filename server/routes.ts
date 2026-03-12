@@ -597,6 +597,113 @@ export async function registerRoutes(
     }
   });
 
+  // 행정경계 배치 임포트 (id 보존)
+  app.post("/api/admin/import-boundaries", async (req, res) => {
+    if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { rows } = req.body as {
+      rows: Array<{
+        id: string; name: string; code: string; level: string; parentCode?: string;
+        geometry: any; properties?: any;
+        minLng?: number; minLat?: number; maxLng?: number; maxLat?: number;
+        centerLng?: number; centerLat?: number;
+      }>;
+    };
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: "rows[] 필요" });
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        let inserted = 0;
+        const CHUNK = 100;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const chunk = rows.slice(i, i + CHUNK);
+          const params: any[] = [];
+          const placeholders = chunk.map((r, j) => {
+            const base = j * 13;
+            params.push(
+              r.id, r.name, r.code, r.level, r.parentCode ?? null,
+              JSON.stringify(r.geometry), JSON.stringify(r.properties ?? {}),
+              r.minLng ?? null, r.minLat ?? null, r.maxLng ?? null, r.maxLat ?? null,
+              r.centerLng ?? null, r.centerLat ?? null
+            );
+            return `($${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9},$${base+10},$${base+11},$${base+12},$${base+13})`;
+          });
+          await client.query(
+            `INSERT INTO administrative_boundaries (id,name,code,level,parent_code,geometry,properties,min_lng,min_lat,max_lng,max_lat,center_lng,center_lat)
+             VALUES ${placeholders.join(",")} ON CONFLICT (id) DO NOTHING`,
+            params
+          );
+          inserted += chunk.length;
+        }
+        await client.query("COMMIT");
+        res.json({ inserted });
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // 경계 집계 캐시 빌드 (레이어×레벨 단위, 기존 캐시 삭제 후 재계산)
+  app.post("/api/admin/build-boundary-cache", async (req, res) => {
+    if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { layerId, level } = req.body as { layerId: string; level: string };
+    if (!layerId || !level) return res.status(400).json({ error: "layerId, level 필요" });
+    try {
+      await pool.query(
+        "DELETE FROM boundary_aggregate_cache WHERE layer_id=$1 AND level=$2",
+        [layerId, level]
+      );
+      const result = await pool.query(`
+        SELECT
+          ab.id as boundary_id, ab.name, ab.code, ab.center_lng, ab.center_lat,
+          COALESCE(fc.cnt, 0)::int as count
+        FROM administrative_boundaries ab
+        LEFT JOIN (
+          SELECT ab2.id as bid, count(*)::int as cnt
+          FROM features f
+          JOIN administrative_boundaries ab2
+            ON ab2.level = $2
+            AND f.lat BETWEEN ab2.min_lat AND ab2.max_lat
+            AND f.lng BETWEEN ab2.min_lng AND ab2.max_lng
+          WHERE f.layer_id = $1
+          GROUP BY ab2.id
+        ) fc ON fc.bid = ab.id
+        WHERE ab.level = $2
+        ORDER BY count DESC
+      `, [layerId, level]);
+
+      const rows = result.rows as any[];
+      const CHUNK = 100;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK);
+        const params: any[] = [];
+        const placeholders = chunk.map((r, j) => {
+          const base = j * 8;
+          params.push(layerId, level, r.boundary_id, r.name, r.code, r.count, r.center_lng, r.center_lat);
+          return `(gen_random_uuid(),$${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8})`;
+        });
+        await pool.query(
+          `INSERT INTO boundary_aggregate_cache (id,layer_id,level,boundary_id,boundary_name,boundary_code,count,center_lng,center_lat)
+           VALUES ${placeholders.join(",")}`,
+          params
+        );
+      }
+      res.json({ level, layerId, count: rows.length });
+    } catch (e: any) {
+      console.error("build-boundary-cache error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // 공간인덱스 생성
   app.post("/api/admin/create-indexes", async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
