@@ -44,8 +44,8 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
   const [newCategoryInput, setNewCategoryInput] = useState("");
   const [geometryType, setGeometryType] = useState("Point");
   const [renderMode, setRenderMode] = useState("auto");
-  const [featureLimit, setFeatureLimit] = useState("2000");
-  const [minZoom, setMinZoom] = useState("15");
+  const [featureLimit, setFeatureLimit] = useState("5000");
+  const [minZoom, setMinZoom] = useState("17");
   const [strokeColor, setStrokeColor] = useState("#0d9488");
   const [fillColor, setFillColor] = useState("#0d948850");
   const [geojsonInput, setGeojsonInput] = useState("");
@@ -112,8 +112,8 @@ export function AddLayerDialog({ open, onOpenChange }: AddLayerDialogProps) {
     setNewCategoryInput("");
     setGeometryType("Point");
     setRenderMode("auto");
-    setFeatureLimit("2000");
-    setMinZoom("15");
+    setFeatureLimit("5000");
+    setMinZoom("17");
     setStrokeColor("#0d9488");
     setFillColor("#0d948850");
     setGeojsonInput("");
