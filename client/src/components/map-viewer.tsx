@@ -663,6 +663,7 @@ export function MapViewer({
             view.un("change:center", syncKakao);
             view.un("change:resolution", syncKakao);
           };
+          mapInstance.current?.render();
         } else {
           const naver = (window as any).naver;
           const container = naverMapDivRef.current;
@@ -721,6 +722,7 @@ export function MapViewer({
             view.un("change:center", syncNaver);
             view.un("change:resolution", syncNaver);
           };
+          mapInstance.current?.render();
         }
       });
     } else {
@@ -803,7 +805,9 @@ export function MapViewer({
     }
 
     const view = map.getView();
-    const extent = view.calculateExtent(map.getSize());
+    const size = map.getSize();
+    if (!size || size[0] === 0 || size[1] === 0) return;
+    const extent = view.calculateExtent(size);
     const bl = toLonLat([extent[0], extent[1]]);
     const tr = toLonLat([extent[2], extent[3]]);
     const bbox = `${bl[0]},${bl[1]},${tr[0]},${tr[1]}`;
