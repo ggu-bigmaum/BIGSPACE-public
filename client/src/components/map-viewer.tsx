@@ -239,17 +239,17 @@ function getClusterStyle(count: number) {
   });
 }
 
-function getBoundaryCircleStyle(count: number, name: string, layer: Layer, level: string) {
+function getBoundaryCircleStyle(count: number, maxCount: number, name: string, layer: Layer, level: string) {
   if (count === 0) return new Style();
   const baseColor = layer.strokeColor || "#0d9488";
   const r = parseInt(baseColor.slice(1, 3), 16);
   const g = parseInt(baseColor.slice(3, 5), 16);
   const b = parseInt(baseColor.slice(5, 7), 16);
   const isSido = level === "시도";
-  const logCount = Math.log10(Math.max(count, 1));
-  const radius = isSido
-    ? Math.min(25 + logCount * 8, 55)
-    : Math.min(18 + logCount * 6, 45);
+  const ratio = Math.sqrt(count / Math.max(maxCount, 1));
+  const minR = isSido ? 12 : 8;
+  const maxR = isSido ? 55 : 45;
+  const radius = minR + (maxR - minR) * ratio;
   const countText = count > 99999 ? `${(count / 1000).toFixed(0)}k` : count > 9999 ? `${(count / 1000).toFixed(1)}k` : count > 999 ? `${(count / 1000).toFixed(1)}k` : count.toString();
   const fontSize = isSido ? Math.max(11, Math.min(radius * 0.35, 16)) : Math.max(10, Math.min(radius * 0.38, 14));
 
@@ -818,6 +818,7 @@ export function MapViewer({
         const boundaryData = await res.json();
 
         const source = new VectorSource();
+        const maxCount = Math.max(...boundaryData.map((b: { count: number }) => b.count), 1);
         boundaryData.forEach((b: { boundaryId: string; name: string; code: string; count: number; centerLng: number; centerLat: number }) => {
           if (b.count === 0) return;
           const feature = new OlFeature({
@@ -826,7 +827,7 @@ export function MapViewer({
             name: b.name,
             boundaryId: b.boundaryId,
           });
-          feature.setStyle(getBoundaryCircleStyle(b.count, b.name, layer, level));
+          feature.setStyle(getBoundaryCircleStyle(b.count, maxCount, b.name, layer, level));
           source.addFeature(feature);
         });
 
