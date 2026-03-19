@@ -416,38 +416,91 @@ export class DatabaseStorage implements IStorage {
         .sort((a, b) => b.count - a.count);
     }
 
-    const result = await db.execute(sql`
-      SELECT
-        ab.id as boundary_id,
-        ab.name,
-        ab.code,
-        ab.center_lng,
-        ab.center_lat,
-        COALESCE(fc.cnt, 0)::int as count
-      FROM administrative_boundaries ab
-      LEFT JOIN (
-        SELECT
-          ab2.id as bid,
-          count(*)::int as cnt
-        FROM features f
-        JOIN administrative_boundaries ab2 ON ab2.level = ${level}
-          AND f.lat BETWEEN ab2.min_lat AND ab2.max_lat
-          AND f.lng BETWEEN ab2.min_lng AND ab2.max_lng
-        WHERE f.layer_id = ${layerId}
-        GROUP BY ab2.id
-      ) fc ON fc.bid = ab.id
-      WHERE ab.level = ${level}
-      ORDER BY count DESC
-    `);
+    // Point-in-Polygon: ray casting algorithm
+    function pointInRing(lng: number, lat: number, ring: number[][]): boolean {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1];
+        const xj = ring[j][0], yj = ring[j][1];
+        if (((yi > lat) !== (yj > lat)) && (lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
 
-    const rows = (result.rows as any[]).map(r => ({
-      boundaryId: r.boundary_id,
-      name: r.name,
-      code: r.code,
-      count: r.count,
-      centerLng: r.center_lng,
-      centerLat: r.center_lat,
+    function pointInGeometry(lng: number, lat: number, geojson: any): boolean {
+      if (!geojson || !geojson.type) return false;
+      if (geojson.type === 'Polygon') {
+        return pointInRing(lng, lat, geojson.coordinates[0]);
+      }
+      if (geojson.type === 'MultiPolygon') {
+        return geojson.coordinates.some((poly: number[][][]) => pointInRing(lng, lat, poly[0]));
+      }
+      return false;
+    }
+
+    // Load all boundaries for this level (with geometry for PIP)
+    const boundaryRows = await db.execute(sql`
+      SELECT id, name, code, center_lng, center_lat,
+             min_lng, min_lat, max_lng, max_lat, geometry
+      FROM administrative_boundaries
+      WHERE level = ${level}
+    `);
+    const boundaries = (boundaryRows.rows as any[]).map(b => ({
+      id: b.id as string,
+      name: b.name as string,
+      code: b.code as string,
+      centerLng: b.center_lng as number,
+      centerLat: b.center_lat as number,
+      minLng: b.min_lng as number,
+      minLat: b.min_lat as number,
+      maxLng: b.max_lng as number,
+      maxLat: b.max_lat as number,
+      geometry: b.geometry,
+      count: 0,
     }));
+
+    // Load all features for this layer (lat/lng only, in batches of 200k)
+    const BATCH = 200000;
+    let offset = 0;
+    const countMap = new Map<string, number>(boundaries.map(b => [b.id, 0]));
+
+    while (true) {
+      const featureRows = await db.execute(sql`
+        SELECT lat, lng FROM features
+        WHERE layer_id = ${layerId} AND lat IS NOT NULL AND lng IS NOT NULL
+        ORDER BY id
+        LIMIT ${BATCH} OFFSET ${offset}
+      `);
+      const pts = featureRows.rows as { lat: number; lng: number }[];
+      if (pts.length === 0) break;
+
+      for (const pt of pts) {
+        const { lng, lat } = pt;
+        for (const b of boundaries) {
+          // Bbox pre-filter (fast), then full PIP (accurate)
+          if (lng >= b.minLng && lng <= b.maxLng && lat >= b.minLat && lat <= b.maxLat) {
+            if (pointInGeometry(lng, lat, b.geometry)) {
+              countMap.set(b.id, (countMap.get(b.id) ?? 0) + 1);
+              break; // a point belongs to exactly one boundary
+            }
+          }
+        }
+      }
+
+      offset += BATCH;
+      if (pts.length < BATCH) break;
+    }
+
+    const rows = boundaries.map(b => ({
+      boundaryId: b.id,
+      name: b.name,
+      code: b.code,
+      count: countMap.get(b.id) ?? 0,
+      centerLng: b.centerLng,
+      centerLat: b.centerLat,
+    })).sort((a, b) => b.count - a.count);
 
     const cacheRows = rows.map(r => ({
       layerId,

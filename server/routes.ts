@@ -710,45 +710,12 @@ export async function registerRoutes(
     const { layerId, level } = req.body as { layerId: string; level: string };
     if (!layerId || !level) return res.status(400).json({ error: "layerId, level 필요" });
     try {
+      // 기존 캐시 삭제 후 storage 함수(PIP 기반)로 재계산
       await pool.query(
         "DELETE FROM boundary_aggregate_cache WHERE layer_id=$1 AND level=$2",
         [layerId, level]
       );
-      const result = await pool.query(`
-        SELECT
-          ab.id as boundary_id, ab.name, ab.code, ab.center_lng, ab.center_lat,
-          COALESCE(fc.cnt, 0)::int as count
-        FROM administrative_boundaries ab
-        LEFT JOIN (
-          SELECT ab2.id as bid, count(*)::int as cnt
-          FROM features f
-          JOIN administrative_boundaries ab2
-            ON ab2.level = $2
-            AND f.lat BETWEEN ab2.min_lat AND ab2.max_lat
-            AND f.lng BETWEEN ab2.min_lng AND ab2.max_lng
-          WHERE f.layer_id = $1
-          GROUP BY ab2.id
-        ) fc ON fc.bid = ab.id
-        WHERE ab.level = $2
-        ORDER BY count DESC
-      `, [layerId, level]);
-
-      const rows = result.rows as any[];
-      const CHUNK = 100;
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const chunk = rows.slice(i, i + CHUNK);
-        const params: any[] = [];
-        const placeholders = chunk.map((r, j) => {
-          const base = j * 8;
-          params.push(layerId, level, r.boundary_id, r.name, r.code, r.count, r.center_lng, r.center_lat);
-          return `(gen_random_uuid(),$${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8})`;
-        });
-        await pool.query(
-          `INSERT INTO boundary_aggregate_cache (id,layer_id,level,boundary_id,boundary_name,boundary_code,count,center_lng,center_lat)
-           VALUES ${placeholders.join(",")}`,
-          params
-        );
-      }
+      const rows = await storage.getBoundaryAggregation(layerId, level, [-180, -90, 180, 90]);
       res.json({ level, layerId, count: rows.length });
     } catch (e: any) {
       console.error("build-boundary-cache error:", e);
