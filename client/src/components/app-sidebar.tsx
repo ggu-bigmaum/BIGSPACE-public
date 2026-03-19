@@ -61,6 +61,7 @@ function getLayerTypeBadge(layer: Layer): string {
 }
 
 function getLayerSizeLabel(layer: Layer): string {
+  if (layer.wmsUrl) return "WMS";
   if (layer.renderMode === "tile" || layer.renderMode === "heatmap") return "Stream";
   const count = layer.featureCount ?? 0;
   if (count > 100000) return `${Math.round(count / 1000)}K`;
@@ -167,7 +168,7 @@ function LayerEditSheet({
             {merged.name}
           </SheetTitle>
           <p className="text-[11px] text-muted-foreground">
-            {merged.geometryType} · 피처 {(merged.featureCount ?? 0).toLocaleString()}개
+            {merged.wmsUrl ? "WMS 외부 레이어" : `${merged.geometryType} · 피처 ${(merged.featureCount ?? 0).toLocaleString()}개`}
           </p>
         </SheetHeader>
 

@@ -945,13 +945,15 @@ export function MapViewer({
         existing.setOpacity(layer.opacity);
       } else {
         const wmsSource = new TileWMS({
-          url: layer.wmsUrl,
+          url: "/api/proxy/wms",
           params: {
             LAYERS: layer.wmsLayers,
             FORMAT: "image/png",
             TRANSPARENT: "TRUE",
             VERSION: "1.1.1",
+            SRS: "EPSG:3857",
           },
+          serverType: "geoserver",
           crossOrigin: "anonymous",
         });
         const tl = new TileLayer({ source: wmsSource, zIndex: 9, opacity: layer.opacity });

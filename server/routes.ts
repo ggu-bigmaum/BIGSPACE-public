@@ -8,6 +8,7 @@ import { pool } from "./db";
 import multer from "multer";
 import proj4 from "proj4";
 import * as fs from "fs";
+import * as https from "https";
 import * as shapefile from "shapefile";
 
 const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 200 * 1024 * 1024 } });
@@ -216,6 +217,35 @@ export async function registerRoutes(
   // Basemap CRUD
   app.get("/api/proxy/naver-tiles/:z/:x/:y", async (_req, res) => {
     res.status(503).json({ message: "네이버 지도는 JavaScript SDK 인증이 필요합니다. NCP 콘솔에서 Web 서비스 URL 설정을 확인하세요." });
+  });
+
+  // VWorld WMS 프록시 (CORS 및 API 키 보호)
+  app.get("/api/proxy/wms", (req, res) => {
+    const params = new URLSearchParams(req.query as Record<string, string>);
+    params.set("KEY", "F1307A7E-E3D0-384E-AF67-0B3AD0976CF8");
+    const path = `/req/wms?${params.toString()}`;
+    const options: https.RequestOptions = {
+      hostname: "api.vworld.kr",
+      port: 443,
+      path,
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; BIGSPACE/1.0)",
+        "Accept": "image/png,image/*",
+      },
+      rejectUnauthorized: false,
+    };
+    const proxyReq = https.request(options, (proxyRes) => {
+      res.setHeader("Content-Type", proxyRes.headers["content-type"] || "image/png");
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.status(proxyRes.statusCode || 200);
+      proxyRes.pipe(res);
+    });
+    proxyReq.on("error", (e) => {
+      console.error("WMS 프록시 오류:", e.message);
+      res.status(500).send("WMS 프록시 오류: " + e.message);
+    });
+    proxyReq.end();
   });
 
   let kakaoSdkCache: { data: string; fetchedAt: number } | null = null;
