@@ -7,6 +7,7 @@ import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
+import TileWMS from "ol/source/TileWMS";
 import GeoJSON from "ol/format/GeoJSON";
 import { fromLonLat, toLonLat, transformExtent } from "ol/proj";
 import { Style, Fill, Stroke, Circle as CircleStyle, Text as TextStyle } from "ol/style";
@@ -316,6 +317,7 @@ export function MapViewer({
   const mapInstance = useRef<OlMap | null>(null);
   const baseTileLayerRef = useRef<TileLayer | null>(null);
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
+  const wmsLayersRef = useRef<Map<string, TileLayer>>(new Map());
   const layerRequestVersionRef = useRef<Map<string, number>>(new Map());
   const highlightLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const radiusLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
@@ -791,6 +793,8 @@ export function MapViewer({
 
   const fetchAndRenderLayer = useCallback(async (layer: Layer) => {
     if (!mapInstance.current) return;
+    // WMS 레이어는 TileWMS로 별도 처리 (아래 useEffect에서 관리)
+    if (layer.wmsUrl) return;
 
     const map = mapInstance.current;
     const existingLayer = vectorLayersRef.current.get(layer.id);
@@ -915,6 +919,8 @@ export function MapViewer({
     if (!mapInstance.current) return;
 
     const currentLayerIds = new Set(layerList.map(l => l.id));
+
+    // 삭제된 벡터 레이어 제거
     vectorLayersRef.current.forEach((vl, id) => {
       if (!currentLayerIds.has(id)) {
         mapInstance.current?.removeLayer(vl);
@@ -922,7 +928,41 @@ export function MapViewer({
       }
     });
 
+    // 삭제된 WMS 레이어 제거
+    wmsLayersRef.current.forEach((tl, id) => {
+      if (!currentLayerIds.has(id)) {
+        mapInstance.current?.removeLayer(tl);
+        wmsLayersRef.current.delete(id);
+      }
+    });
+
+    // WMS 레이어 생성/갱신
     layerList.forEach(layer => {
+      if (!layer.wmsUrl || !layer.wmsLayers) return;
+      const existing = wmsLayersRef.current.get(layer.id);
+      if (existing) {
+        existing.setVisible(layer.visible);
+        existing.setOpacity(layer.opacity);
+      } else {
+        const wmsSource = new TileWMS({
+          url: layer.wmsUrl,
+          params: {
+            LAYERS: layer.wmsLayers,
+            FORMAT: "image/png",
+            TRANSPARENT: "TRUE",
+            VERSION: "1.1.1",
+          },
+          crossOrigin: "anonymous",
+        });
+        const tl = new TileLayer({ source: wmsSource, zIndex: 9, opacity: layer.opacity });
+        tl.setVisible(layer.visible);
+        mapInstance.current?.addLayer(tl);
+        wmsLayersRef.current.set(layer.id, tl);
+      }
+    });
+
+    layerList.forEach(layer => {
+      if (layer.wmsUrl) return;
       const existingLayer = vectorLayersRef.current.get(layer.id);
       if (!layer.visible && existingLayer) {
         const v = (layerRequestVersionRef.current.get(layer.id) || 0) + 1;

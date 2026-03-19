@@ -39,6 +39,8 @@ export const layers = pgTable("layers", {
   pointRadius: real("point_radius").notNull().default(6),
   featureCount: integer("feature_count").notNull().default(0),
   bounds: jsonb("bounds"),
+  wmsUrl: text("wms_url"),
+  wmsLayers: text("wms_layers"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
