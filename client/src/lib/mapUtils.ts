@@ -1,5 +1,16 @@
 import type { Layer } from "@shared/schema";
 
+export function getApproxScale(zoom: number): string {
+  const scaleMap: Record<number, string> = {
+    2: "150,000,000", 3: "70,000,000", 4: "35,000,000", 5: "15,000,000",
+    6: "10,000,000", 7: "4,000,000", 8: "2,000,000", 9: "1,000,000",
+    10: "500,000", 11: "250,000", 12: "150,000", 13: "70,000",
+    14: "35,000", 15: "15,000", 16: "8,000", 17: "4,000",
+    18: "2,000", 19: "1,000", 20: "500",
+  };
+  return scaleMap[zoom] || scaleMap[Math.min(20, Math.max(2, Math.round(zoom)))] || "N/A";
+}
+
 export function getLayerColor(layer: Layer): string {
   return layer.strokeColor || "#3b82f6";
 }

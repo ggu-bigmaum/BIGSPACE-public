@@ -17,6 +17,7 @@ function MapLayout() {
   const [addLayerDialogOpen, setAddLayerDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [radiusOpen, setRadiusOpen] = useState(false);
 
   const style = {
     "--sidebar-width": "18rem",
@@ -31,6 +32,7 @@ function MapLayout() {
           onLayerSelect={setSelectedLayerId}
           onSettingsOpen={() => setSettingsOpen(true)}
           onAnalysisOpen={() => setAnalysisOpen(true)}
+          onRadiusOpen={() => setRadiusOpen(true)}
           onAddLayer={() => setAddLayerDialogOpen(true)}
           selectedLayerId={selectedLayerId}
         />
@@ -39,6 +41,8 @@ function MapLayout() {
             selectedLayerId={selectedLayerId}
             analysisOpen={analysisOpen}
             onAnalysisClose={() => setAnalysisOpen(false)}
+            radiusOpen={radiusOpen}
+            onRadiusClose={() => setRadiusOpen(false)}
           />
         </main>
       </div>

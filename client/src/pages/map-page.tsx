@@ -13,17 +13,23 @@ interface MapPageProps {
   selectedLayerId?: string | null;
   analysisOpen?: boolean;
   onAnalysisClose?: () => void;
+  radiusOpen?: boolean;
+  onRadiusClose?: () => void;
 }
 
 export default function MapPage({
   selectedLayerId = null,
   analysisOpen = false,
   onAnalysisClose,
+  radiusOpen = false,
+  onRadiusClose,
 }: MapPageProps) {
-  const activeTool = "select";
+  const activeTool = radiusOpen ? "radius" : "select";
   const { toast } = useToast();
-  const [currentBbox, setCurrentBbox] = useState<number[]>([]);
-  const [currentZoom, setCurrentZoom] = useState(11);
+  const [mapView, setMapView] = useState<{ zoom: number; bbox: [number, number, number, number] }>({
+    zoom: 11,
+    bbox: [126.5, 37.2, 127.5, 37.9],
+  });
   const [selectionBbox, setSelectionBbox] = useState<[number, number, number, number] | null>(null);
 
   const [radiusCenter, setRadiusCenter] = useState<{ lng: number; lat: number } | null>(null);
@@ -87,16 +93,16 @@ export default function MapPage({
         layers={layers}
         selectedLayerId={selectedLayerId}
         activeTool={activeTool || "select"}
+        mapView={mapView}
+        onViewChange={setMapView}
         onMapClick={handleMapClick}
         onBoxSelect={handleBoxSelect}
-        onBboxChange={setCurrentBbox}
-        onZoomChange={setCurrentZoom}
         radiusCenter={radiusCenter}
         radiusKm={radiusKm}
         searchResults={searchResults}
       />
 
-      {activeTool === "radius" && (
+      {radiusOpen && (
         <RadiusSearchPanel
           center={radiusCenter}
           onCenterChange={setRadiusCenter}
@@ -104,6 +110,7 @@ export default function MapPage({
           onRadiusChange={setRadiusKm}
           onSearch={handleRadiusSearch}
           onClear={handleClearSearch}
+          onClose={() => { handleClearSearch(); onRadiusClose?.(); }}
           results={searchResults}
           isSearching={isSearching}
         />
@@ -120,8 +127,8 @@ export default function MapPage({
       {selectedLayer && !selectionBbox && (
         <FeatureInfoPanel
           layer={selectedLayer}
-          bbox={currentBbox}
-          zoom={currentZoom}
+          bbox={mapView.bbox}
+          zoom={mapView.zoom}
         />
       )}
 

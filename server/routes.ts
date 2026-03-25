@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as https from "https";
 import * as shapefile from "shapefile";
 
-const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 200 * 1024 * 1024 } });
+const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 1024 * 1024 * 1024 } }); // 1GB
 
 const NCP_CLIENT_ID = process.env.NCP_CLIENT_ID || "";
 const NCP_CLIENT_SECRET = process.env.NCP_CLIENT_SECRET || "";
@@ -222,7 +222,8 @@ export async function registerRoutes(
   // VWorld WMS 프록시 (CORS 및 API 키 보호)
   app.get("/api/proxy/wms", (req, res) => {
     const params = new URLSearchParams(req.query as Record<string, string>);
-    params.set("KEY", "F1307A7E-E3D0-384E-AF67-0B3AD0976CF8");
+    params.set("KEY", process.env.VITE_VWORLD_KEY || "");
+    params.set("DOMAIN", req.hostname);
     const path = `/req/wms?${params.toString()}`;
     const options: https.RequestOptions = {
       hostname: "api.vworld.kr",

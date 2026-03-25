@@ -29,7 +29,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Layers, Map, Download, Settings2, Globe, Info, Cpu,
+  Layers, Map, Download, Settings2, Globe, Info, Cpu, CircleDot,
   Siren, Landmark, Car, Building2, TreePine, Users, Package, Zap, Hash,
   Pencil, Trash2, Plus, Check,
 } from "lucide-react";
@@ -48,6 +48,7 @@ interface AppSidebarProps {
   onLayerSelect?: (layerId: string | null) => void;
   onSettingsOpen?: () => void;
   onAnalysisOpen?: () => void;
+  onRadiusOpen?: () => void;
   onAddLayer?: () => void;
   selectedLayerId?: string | null;
 }
@@ -396,6 +397,7 @@ export function AppSidebar({
   onLayerSelect,
   onSettingsOpen,
   onAnalysisOpen,
+  onRadiusOpen,
   onAddLayer,
   selectedLayerId,
 }: AppSidebarProps) {
@@ -478,6 +480,22 @@ export function AppSidebar({
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">제품 소개</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => { onRadiusOpen?.(); closeMobileIfNeeded(); }}
+                      data-testid="button-radius-search"
+                    >
+                      <CircleDot className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">반경 검색</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               <TooltipProvider delayDuration={300}>
