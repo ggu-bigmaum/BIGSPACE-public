@@ -223,7 +223,7 @@ export async function registerRoutes(
   app.get("/api/proxy/wms", (req, res) => {
     const params = new URLSearchParams(req.query as Record<string, string>);
     params.set("KEY", process.env.VITE_VWORLD_KEY || "");
-    params.set("DOMAIN", req.hostname);
+    params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
     const path = `/req/wms?${params.toString()}`;
     const options: https.RequestOptions = {
       hostname: "api.vworld.kr",
