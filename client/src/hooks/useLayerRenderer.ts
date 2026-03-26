@@ -168,15 +168,16 @@ export function useLayerRenderer(
           format: new GeoJSON(),
           loader: (extent, _resolution, projection, success, failure) => {
             const [minLon, minLat, maxLon, maxLat] = transformExtent(extent, projection, "EPSG:4326");
+            // WFS 1.1.0 + EPSG:4326: 축 순서가 lat,lon (VWorld 표준)
             const params = new URLSearchParams({
               SERVICE: "WFS",
-              VERSION: "2.0.0",
+              VERSION: "1.1.0",
               REQUEST: "GetFeature",
-              TYPENAMES: wfsTypeName,
-              BBOX: `${minLon},${minLat},${maxLon},${maxLat},EPSG:4326`,
+              TYPENAME: wfsTypeName,
+              BBOX: `${minLat},${minLon},${maxLat},${maxLon},EPSG:4326`,
               SRSNAME: "EPSG:4326",
-              OUTPUTFORMAT: "application/json",
-              COUNT: "500",
+              OUTPUT: "application/json",
+              MAXFEATURES: "500",
             });
             fetch(`/api/proxy/wfs?${params.toString()}`)
               .then(r => r.json())
