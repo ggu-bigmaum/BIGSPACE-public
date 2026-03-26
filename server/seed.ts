@@ -184,8 +184,23 @@ async function upsertEmergencyLayers() {
   const existingLayers = await storage.getLayers();
   const existingNames = new Set(existingLayers.map(l => l.name));
 
-  const emergencyLayers = [
-    {
+  // 데이터 없는 21/22 레이어 삭제
+  for (const layer of existingLayers) {
+    if (layer.name === "응급출동 현황 2021" || layer.name === "응급출동 현황 2022") {
+      await storage.deleteLayer(layer.id);
+      console.log(`Removed empty layer: ${layer.name}`);
+    }
+  }
+
+  // 샘플 레이어 카테고리 통합
+  for (const layer of existingLayers) {
+    if (["인프라", "교통", "행정"].includes(layer.category || "")) {
+      await storage.updateLayer(layer.id, { category: "공간데이터" });
+    }
+  }
+
+  if (!existingNames.has("응급출동 현황 2020")) {
+    await storage.createLayer({
       name: "응급출동 현황 2020",
       description: "소방청 구급출동 데이터 (2020년)",
       category: "응급출동",
@@ -203,52 +218,8 @@ async function upsertEmergencyLayers() {
       fillColor: "#65a30d40",
       strokeWidth: 1,
       pointRadius: 4,
-    },
-    {
-      name: "응급출동 현황 2021",
-      description: "소방청 구급출동 데이터 (2021년)",
-      category: "응급출동",
-      geometryType: "Point" as const,
-      srid: 4326,
-      renderMode: "auto" as const,
-      featureLimit: 5000,
-      minZoomForFeatures: 14,
-      minZoomForClusters: 8,
-      tileEnabled: true,
-      tileMaxZoom: 14,
-      visible: false,
-      opacity: 1,
-      strokeColor: "#0d9488",
-      fillColor: "#0d948850",
-      strokeWidth: 1,
-      pointRadius: 4,
-    },
-    {
-      name: "응급출동 현황 2022",
-      description: "소방청 구급출동 데이터 (2022년)",
-      category: "응급출동",
-      geometryType: "Point" as const,
-      srid: 4326,
-      renderMode: "auto" as const,
-      featureLimit: 5000,
-      minZoomForFeatures: 14,
-      minZoomForClusters: 8,
-      tileEnabled: true,
-      tileMaxZoom: 14,
-      visible: false,
-      opacity: 0.65,
-      strokeColor: "#ef4444",
-      fillColor: "#ef444480",
-      strokeWidth: 1,
-      pointRadius: 4,
-    },
-  ];
-
-  for (const layer of emergencyLayers) {
-    if (!existingNames.has(layer.name)) {
-      await storage.createLayer(layer);
-      console.log(`Created layer metadata: ${layer.name} (upload CSV to add features)`);
-    }
+    });
+    console.log("Created layer metadata: 응급출동 현황 2020");
   }
 }
 

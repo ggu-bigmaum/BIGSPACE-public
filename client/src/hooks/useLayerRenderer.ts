@@ -4,6 +4,7 @@ import VectorSource from "ol/source/Vector";
 import TileLayer from "ol/layer/Tile";
 import TileWMS from "ol/source/TileWMS";
 import GeoJSON from "ol/format/GeoJSON";
+import { bbox as bboxStrategy } from "ol/loadingstrategy";
 import { fromLonLat, toLonLat, transformExtent } from "ol/proj";
 import { Feature as OlFeature } from "ol";
 import { Point } from "ol/geom";
@@ -20,6 +21,7 @@ export function useLayerRenderer(
 ) {
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
   const wmsLayersRef = useRef<Map<string, TileLayer>>(new Map());
+  const wfsLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
   const layerRequestVersionRef = useRef<Map<string, number>>(new Map());
   const prevVisibleIdsRef = useRef<Set<string>>(new Set());
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -38,7 +40,7 @@ export function useLayerRenderer(
   }, []);
 
   const fetchAndRenderLayer = useCallback(async (layer: Layer) => {
-    if (!mapInstance.current || layer.wmsUrl) return;
+    if (!mapInstance.current || layer.wmsUrl || layer.wfsUrl) return;
 
     const map = mapInstance.current;
     const existing = vectorLayersRef.current.get(layer.id);
@@ -149,6 +151,50 @@ export function useLayerRenderer(
     });
     wmsLayersRef.current.forEach((tl, id) => {
       if (!currentIds.has(id)) { mapInstance.current?.removeLayer(tl); wmsLayersRef.current.delete(id); }
+    });
+    wfsLayersRef.current.forEach((vl, id) => {
+      if (!currentIds.has(id)) { mapInstance.current?.removeLayer(vl); wfsLayersRef.current.delete(id); }
+    });
+
+    layerList.forEach(layer => {
+      if (!layer.wfsUrl || !layer.wfsLayers) return;
+      const existingWfs = wfsLayersRef.current.get(layer.id);
+      if (existingWfs) {
+        existingWfs.setVisible(layer.visible);
+        existingWfs.setOpacity(layer.opacity);
+      } else {
+        const wfsTypeName = layer.wfsLayers;
+        const wfsSource = new VectorSource({
+          format: new GeoJSON(),
+          loader: (extent, _resolution, projection, success, failure) => {
+            const [minLon, minLat, maxLon, maxLat] = transformExtent(extent, projection, "EPSG:4326");
+            const params = new URLSearchParams({
+              SERVICE: "WFS",
+              VERSION: "2.0.0",
+              REQUEST: "GetFeature",
+              TYPENAMES: wfsTypeName,
+              BBOX: `${minLon},${minLat},${maxLon},${maxLat},EPSG:4326`,
+              SRSNAME: "EPSG:4326",
+              OUTPUTFORMAT: "application/json",
+              COUNT: "500",
+            });
+            fetch(`/api/proxy/wfs?${params.toString()}`)
+              .then(r => r.json())
+              .then(data => {
+                const features = new GeoJSON().readFeatures(data, { featureProjection: "EPSG:3857" });
+                wfsSource.addFeatures(features);
+                success?.(features);
+              })
+              .catch(() => failure?.());
+          },
+          strategy: bboxStrategy,
+        });
+        const style = getLayerStyle(layer);
+        const vl = new VectorLayer({ source: wfsSource, style, zIndex: 8, opacity: layer.opacity, minZoom: 11 });
+        vl.setVisible(layer.visible);
+        mapInstance.current?.addLayer(vl);
+        wfsLayersRef.current.set(layer.id, vl);
+      }
     });
 
     layerList.forEach(layer => {

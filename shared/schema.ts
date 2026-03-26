@@ -41,6 +41,8 @@ export const layers = pgTable("layers", {
   bounds: jsonb("bounds"),
   wmsUrl: text("wms_url"),
   wmsLayers: text("wms_layers"),
+  wfsUrl: text("wfs_url"),
+  wfsLayers: text("wfs_layers"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

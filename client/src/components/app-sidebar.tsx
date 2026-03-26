@@ -576,6 +576,7 @@ export function AppSidebar({
                                 "응급출동": Siren, "행정": Landmark, "교통": Car,
                                 "인프라": Building2, "환경": TreePine, "인구": Users,
                                 "물류": Package, "에너지": Zap,
+                                "공간데이터": Layers, "VWorld": Globe,
                               };
                               const fallbackIcons = [Hash, Globe, Map, Layers];
                               const Icon = iconMap[cat] || fallbackIcons[cat.length % fallbackIcons.length];
@@ -680,6 +681,7 @@ export function AppSidebar({
                                         </AlertDialogContent>
                                       </AlertDialog>
                                     </div>
+                                    {typeBadge !== "VECTOR" && (
                                     <TooltipProvider delayDuration={300}>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
@@ -717,6 +719,7 @@ export function AppSidebar({
                                         </TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
+                                    )}
                                   </div>
                                 </div>
                               </div>

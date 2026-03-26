@@ -249,6 +249,35 @@ export async function registerRoutes(
     proxyReq.end();
   });
 
+  // VWorld WFS 프록시 (CORS 및 API 키 보호)
+  app.get("/api/proxy/wfs", (req, res) => {
+    const params = new URLSearchParams(req.query as Record<string, string>);
+    params.set("KEY", process.env.VITE_VWORLD_KEY || "");
+    params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
+    const path = `/req/wfs?${params.toString()}`;
+    const options: https.RequestOptions = {
+      hostname: "api.vworld.kr",
+      port: 443,
+      path,
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; BIGSPACE/1.0)",
+        "Accept": "application/json",
+      },
+      rejectUnauthorized: false,
+    };
+    const proxyReq = https.request(options, (proxyRes) => {
+      res.setHeader("Content-Type", proxyRes.headers["content-type"] || "application/json");
+      res.status(proxyRes.statusCode || 200);
+      proxyRes.pipe(res);
+    });
+    proxyReq.on("error", (e) => {
+      console.error("WFS 프록시 오류:", e.message);
+      res.status(500).send("WFS 프록시 오류: " + e.message);
+    });
+    proxyReq.end();
+  });
+
   let kakaoSdkCache: { data: string; fetchedAt: number } | null = null;
   app.get("/api/proxy/kakao-sdk", async (_req, res) => {
     try {
