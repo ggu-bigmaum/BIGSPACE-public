@@ -99,17 +99,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFeaturesByLayer(layerId: string, bbox?: number[], limit: number = 2000): Promise<Feature[]> {
-    const conditions = [eq(features.layerId, layerId)];
-
     if (bbox && bbox.length === 4) {
-      const [bboxMinLng, bboxMinLat, bboxMaxLng, bboxMaxLat] = bbox;
-      conditions.push(lte(features.minLng!, bboxMaxLng));
-      conditions.push(gte(features.maxLng!, bboxMinLng));
-      conditions.push(lte(features.minLat!, bboxMaxLat));
-      conditions.push(gte(features.maxLat!, bboxMinLat));
+      const [minLng, minLat, maxLng, maxLat] = bbox;
+      // PostGIS ST_Intersects + GIST 인덱스 활용
+      const result = await db.execute(sql`
+        SELECT * FROM features
+        WHERE layer_id = ${layerId}
+          AND geom IS NOT NULL
+          AND ST_Intersects(geom, ST_MakeEnvelope(${minLng}::float8, ${minLat}::float8, ${maxLng}::float8, ${maxLat}::float8, 4326))
+        LIMIT ${limit}
+      `);
+      return result.rows as Feature[];
     }
-
-    return db.select().from(features).where(and(...conditions)).limit(limit);
+    return db.select().from(features).where(eq(features.layerId, layerId)).limit(limit);
   }
 
   async getFeature(id: string): Promise<Feature | undefined> {
@@ -120,6 +122,12 @@ export class DatabaseStorage implements IStorage {
   async createFeature(feature: InsertFeature): Promise<Feature> {
     const enriched = this.enrichFeatureCoords(feature);
     const [created] = await db.insert(features).values(enriched).returning();
+    // geom 컬럼 동기화 (PostGIS)
+    await db.execute(sql`
+      UPDATE features
+      SET geom = ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)
+      WHERE id = ${created.id} AND geom IS NULL
+    `);
     await this.refreshLayerStats(feature.layerId);
     return created;
   }
@@ -133,6 +141,14 @@ export class DatabaseStorage implements IStorage {
       const batch = enriched.slice(i, i + batchSize);
       const created = await db.insert(features).values(batch).returning();
       results.push(...created);
+      // 배치 단위로 geom 컬럼 동기화
+      const ids = created.map(f => f.id);
+      await db.execute(sql`
+        UPDATE features
+        SET geom = ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)
+        WHERE id = ANY(ARRAY[${sql.join(ids.map(id => sql`${id}`), sql`, `)}]::text[])
+          AND geom IS NULL
+      `);
     }
     if (featureList.length > 0) {
       await this.refreshLayerStats(featureList[0].layerId);
@@ -161,47 +177,43 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFeaturesInRadius(lng: number, lat: number, radiusKm: number, layerIds?: string[]): Promise<Feature[]> {
-    const degPerKm = 1 / 111.32;
-    const radiusDeg = radiusKm * degPerKm;
+    // ST_DWithin: geography 타입으로 캐스팅 → 미터 단위 정확한 거리 계산
+    const radiusMeters = radiusKm * 1000;
+    const layerFilter = layerIds && layerIds.length > 0
+      ? sql`AND layer_id = ANY(ARRAY[${sql.join(layerIds.map(id => sql`${id}`), sql`, `)}]::text[])`
+      : sql``;
 
-    const conditions = [
-      gte(features.lng!, lng - radiusDeg),
-      lte(features.lng!, lng + radiusDeg),
-      gte(features.lat!, lat - radiusDeg),
-      lte(features.lat!, lat + radiusDeg),
-    ];
-
-    if (layerIds && layerIds.length > 0) {
-      conditions.push(sql`${features.layerId} = ANY(${layerIds})`);
-    }
-
-    const results = await db.select().from(features).where(and(...conditions)).limit(5000);
-
-    return results.filter(f => {
-      if (f.lng == null || f.lat == null) return false;
-      const dx = (f.lng - lng) * Math.cos((lat * Math.PI) / 180);
-      const dy = f.lat - lat;
-      const dist = Math.sqrt(dx * dx + dy * dy) * 111.32;
-      return dist <= radiusKm;
-    });
+    const result = await db.execute(sql`
+      SELECT * FROM features
+      WHERE geom IS NOT NULL
+        AND ST_DWithin(
+          geom::geography,
+          ST_SetSRID(ST_MakePoint(${lng}::float8, ${lat}::float8), 4326)::geography,
+          ${radiusMeters}::float8
+        )
+        ${layerFilter}
+      LIMIT 5000
+    `);
+    return result.rows as Feature[];
   }
 
   async getFeaturesInBbox(layerId: string, bbox: number[], limit: number): Promise<{ count: number; features: { id: string; lng: number; lat: number; properties: any }[] }> {
     const [minLng, minLat, maxLng, maxLat] = bbox;
+    const envelope = sql`ST_MakeEnvelope(${minLng}::float8, ${minLat}::float8, ${maxLng}::float8, ${maxLat}::float8, 4326)`;
 
     const countResult = await db.execute(sql`
-      SELECT count(*)::int as total FROM ${features}
-      WHERE ${features.layerId} = ${layerId}
-        AND ${features.lng} >= ${minLng}::float AND ${features.lng} <= ${maxLng}::float
-        AND ${features.lat} >= ${minLat}::float AND ${features.lat} <= ${maxLat}::float
+      SELECT count(*)::int AS total FROM features
+      WHERE layer_id = ${layerId}
+        AND geom IS NOT NULL
+        AND ST_Intersects(geom, ${envelope})
     `);
     const total = (countResult.rows[0] as any).total;
 
     const result = await db.execute(sql`
-      SELECT id, lng, lat, properties FROM ${features}
-      WHERE ${features.layerId} = ${layerId}
-        AND ${features.lng} >= ${minLng}::float AND ${features.lng} <= ${maxLng}::float
-        AND ${features.lat} >= ${minLat}::float AND ${features.lat} <= ${maxLat}::float
+      SELECT id, lng, lat, properties FROM features
+      WHERE layer_id = ${layerId}
+        AND geom IS NOT NULL
+        AND ST_Intersects(geom, ${envelope})
       LIMIT ${limit}
     `);
 
@@ -223,18 +235,16 @@ export class DatabaseStorage implements IStorage {
 
     const result = await db.execute(sql`
       SELECT
-        avg(${features.lng})::float as lng,
-        avg(${features.lat})::float as lat,
-        count(*)::int as count
-      FROM ${features}
-      WHERE ${features.layerId} = ${layerId}
-        AND ${features.lng} >= ${minLng}::float
-        AND ${features.lng} <= ${maxLng}::float
-        AND ${features.lat} >= ${minLat}::float
-        AND ${features.lat} <= ${maxLat}::float
+        (${minLng}::float8 + (floor((ST_X(geom::geometry) - ${minLng}::float8) / ${lngStep}::float8) + 0.5) * ${lngStep}::float8)::float8 AS lng,
+        (${minLat}::float8 + (floor((ST_Y(geom::geometry) - ${minLat}::float8) / ${latStep}::float8) + 0.5) * ${latStep}::float8)::float8 AS lat,
+        count(*)::int AS count
+      FROM features
+      WHERE layer_id = ${layerId}
+        AND geom IS NOT NULL
+        AND ST_Intersects(geom, ST_MakeEnvelope(${minLng}::float8, ${minLat}::float8, ${maxLng}::float8, ${maxLat}::float8, 4326))
       GROUP BY
-        floor((${features.lng} - ${minLng}::float) / ${lngStep}::float),
-        floor((${features.lat} - ${minLat}::float) / ${latStep}::float)
+        floor((ST_X(geom::geometry) - ${minLng}::float8) / ${lngStep}::float8),
+        floor((ST_Y(geom::geometry) - ${minLat}::float8) / ${latStep}::float8)
       HAVING count(*) > 0
       ORDER BY count DESC
       LIMIT 500
@@ -464,14 +474,15 @@ export class DatabaseStorage implements IStorage {
 
   async refreshLayerStats(layerId: string): Promise<void> {
     const count = await this.getFeatureCount(layerId);
+    // PostGIS ST_Extent로 정확한 바운딩박스 계산
     const boundsResult = await db.execute(sql`
       SELECT
-        min(${features.minLng}) as min_lng,
-        min(${features.minLat}) as min_lat,
-        max(${features.maxLng}) as max_lng,
-        max(${features.maxLat}) as max_lat
-      FROM ${features}
-      WHERE ${features.layerId} = ${layerId}
+        ST_XMin(ST_Extent(geom))::float8 AS min_lng,
+        ST_YMin(ST_Extent(geom))::float8 AS min_lat,
+        ST_XMax(ST_Extent(geom))::float8 AS max_lng,
+        ST_YMax(ST_Extent(geom))::float8 AS max_lat
+      FROM features
+      WHERE layer_id = ${layerId} AND geom IS NOT NULL
     `);
     const b = boundsResult.rows[0] as any;
     const bounds = b && b.min_lng != null ? [b.min_lng, b.min_lat, b.max_lng, b.max_lat] : null;
