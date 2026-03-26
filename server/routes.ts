@@ -72,12 +72,11 @@ export async function registerRoutes(
       const hashed = await hashPassword(password);
       const user = await storage.createUser({ username, password: hashed });
 
-      // 첫 번째 사용자는 자동으로 admin
-      const allUsers = await db.execute({ sql: "SELECT COUNT(*)::int AS cnt FROM users", values: [] } as any);
-      // 간단하게: createUser 직후 users 테이블에 1명이면 admin으로 승격
+      // 첫 번째 사용자는 자동으로 admin 승격
       const countResult = await pool.query("SELECT COUNT(*)::int AS cnt FROM users");
       if (countResult.rows[0].cnt <= 1) {
         await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [user.id]);
+        user.role = "admin";
       }
 
       // 자동 로그인
