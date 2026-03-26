@@ -1,42 +1,167 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertLayerSchema, insertFeatureSchema, insertBasemapSchema, insertAppSettingSchema } from "@shared/schema";
+import { insertLayerSchema, insertFeatureSchema, insertBasemapSchema, insertAppSettingSchema, auditLogs } from "@shared/schema";
 import type { InsertAdminBoundary } from "@shared/schema";
 import { z } from "zod";
 import { pool } from "./db";
+import { db } from "./db";
 import multer from "multer";
 import proj4 from "proj4";
 import * as fs from "fs";
 import * as https from "https";
 import * as shapefile from "shapefile";
+import passport from "passport";
+import { hashPassword, requireAuth, requireAdmin } from "./auth";
 
 const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 1024 * 1024 * 1024 } }); // 1GB
 
 const NCP_CLIENT_ID = process.env.NCP_CLIENT_ID || "";
 const NCP_CLIENT_SECRET = process.env.NCP_CLIENT_SECRET || "";
 
+// ── 감사 로그 헬퍼 (GS 인증 1-4) ───────────────────────────────────────
+function getClientIp(req: Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+  return req.socket?.remoteAddress || "unknown";
+}
+
+async function writeAuditLog(req: Request, action: string, resource?: string, resourceId?: string, details?: any) {
+  try {
+    const user = req.user as any;
+    await db.insert(auditLogs).values({
+      userId: user?.id || null,
+      username: user?.username || null,
+      action,
+      resource: resource || null,
+      resourceId: resourceId || null,
+      ip: getClientIp(req),
+      userAgent: req.headers["user-agent"] || null,
+      details: details || null,
+    });
+  } catch (e) {
+    console.error("Audit log write failed:", e);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
 
-  // Layer CRUD
-  app.get("/api/layers", async (_req, res) => {
+  // ══════════════════════════════════════════════════════════════════════
+  // 인증 API (GS 인증 1-1, 1-2, 1-6)
+  // ══════════════════════════════════════════════════════════════════════
+
+  /** 회원가입 */
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ message: "아이디와 비밀번호를 입력해주세요." });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ message: "비밀번호는 8자 이상이어야 합니다." });
+      }
+
+      const existing = await storage.getUserByUsername(username);
+      if (existing) {
+        return res.status(409).json({ message: "이미 사용 중인 아이디입니다." });
+      }
+
+      const hashed = await hashPassword(password);
+      const user = await storage.createUser({ username, password: hashed });
+
+      // 첫 번째 사용자는 자동으로 admin
+      const allUsers = await db.execute({ sql: "SELECT COUNT(*)::int AS cnt FROM users", values: [] } as any);
+      // 간단하게: createUser 직후 users 테이블에 1명이면 admin으로 승격
+      const countResult = await pool.query("SELECT COUNT(*)::int AS cnt FROM users");
+      if (countResult.rows[0].cnt <= 1) {
+        await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [user.id]);
+      }
+
+      // 자동 로그인
+      req.login(user, (err) => {
+        if (err) return res.status(500).json({ message: "로그인 처리 중 오류가 발생했습니다." });
+        writeAuditLog(req, "REGISTER", "user", user.id);
+        const { password: _, ...safeUser } = user;
+        return res.status(201).json(safeUser);
+      });
+    } catch (e: any) {
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
+  /** 로그인 */
+  app.post("/api/auth/login", (req: Request, res: Response, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+      if (!user) {
+        // GS 인증 1-1: 단일화된 오류 메시지
+        writeAuditLog(req, "LOGIN_FAILED", "user", undefined, { username: req.body.username });
+        return res.status(401).json({ message: info?.message || "아이디 또는 비밀번호가 올바르지 않습니다." });
+      }
+      req.login(user, (loginErr) => {
+        if (loginErr) return res.status(500).json({ message: "로그인 처리 중 오류가 발생했습니다." });
+        writeAuditLog(req, "LOGIN", "user", user.id);
+        const { password: _, ...safeUser } = user;
+        return res.json(safeUser);
+      });
+    })(req, res, next);
+  });
+
+  /** 로그아웃 (GS 인증 1-6: 세션 완전 파기) */
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
+    writeAuditLog(req, "LOGOUT", "user", (req.user as any)?.id);
+    req.logout((err) => {
+      if (err) return res.status(500).json({ message: "로그아웃 처리 중 오류가 발생했습니다." });
+      req.session.destroy((sessionErr) => {
+        if (sessionErr) console.error("Session destroy error:", sessionErr);
+        res.clearCookie("connect.sid");
+        return res.json({ message: "로그아웃되었습니다." });
+      });
+    });
+  });
+
+  /** 현재 사용자 조회 */
+  app.get("/api/auth/me", (req: Request, res: Response) => {
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.status(401).json({ message: "로그인이 필요합니다." });
+    }
+    const { password: _, ...safeUser } = req.user as any;
+    return res.json(safeUser);
+  });
+
+  /** 감사 로그 조회 (admin only) */
+  app.get("/api/admin/audit-logs", requireAdmin, async (req: Request, res: Response) => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const result = await pool.query(
+      "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+      [limit, offset]
+    );
+    const countResult = await pool.query("SELECT COUNT(*)::int AS total FROM audit_logs");
+    res.json({ logs: result.rows, total: countResult.rows[0].total });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Layer CRUD (GS 인증 1-3: 권한별 접근 통제)
+  app.get("/api/layers", requireAuth, async (_req, res) => {
     const layers = await storage.getLayers();
     res.json(layers);
   });
 
-  app.get("/api/layers/:id", async (req, res) => {
+  app.get("/api/layers/:id", requireAuth, async (req, res) => {
     const layer = await storage.getLayer(req.params.id);
     if (!layer) return res.status(404).json({ message: "Layer not found" });
     res.json(layer);
   });
 
-  app.post("/api/layers", async (req, res) => {
+  app.post("/api/layers", requireAdmin, async (req, res) => {
     try {
       const data = insertLayerSchema.parse(req.body);
       const layer = await storage.createLayer(data);
+      writeAuditLog(req, "CREATE", "layer", layer.id, { name: layer.name });
       res.status(201).json(layer);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -61,24 +186,26 @@ export async function registerRoutes(
     tileMaxZoom: z.number().int().min(0).max(22).optional(),
   }).strict();
 
-  app.patch("/api/layers/:id", async (req, res) => {
+  app.patch("/api/layers/:id", requireAdmin, async (req, res) => {
     const parsed = layerUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "잘못된 요청 데이터", errors: parsed.error.flatten() });
     }
     const layer = await storage.updateLayer(req.params.id, parsed.data);
     if (!layer) return res.status(404).json({ message: "Layer not found" });
+    writeAuditLog(req, "UPDATE", "layer", layer.id, parsed.data);
     res.json(layer);
   });
 
-  app.delete("/api/layers/:id", async (req, res) => {
+  app.delete("/api/layers/:id", requireAdmin, async (req, res) => {
     const ok = await storage.deleteLayer(req.params.id);
     if (!ok) return res.status(404).json({ message: "Layer not found" });
+    writeAuditLog(req, "DELETE", "layer", req.params.id);
     res.json({ success: true });
   });
 
   // Feature API with BBOX filtering
-  app.get("/api/layers/:id/features", async (req, res) => {
+  app.get("/api/layers/:id/features", requireAuth, async (req, res) => {
     const { bbox, limit, zoom } = req.query;
     const layer = await storage.getLayer(req.params.id);
     if (!layer) return res.status(404).json({ message: "Layer not found" });
@@ -108,7 +235,7 @@ export async function registerRoutes(
     });
   });
 
-  app.post("/api/layers/:id/features", async (req, res) => {
+  app.post("/api/layers/:id/features", requireAdmin, async (req, res) => {
     try {
       const layer = await storage.getLayer(req.params.id);
       if (!layer) return res.status(404).json({ message: "Layer not found" });
@@ -134,12 +261,12 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/layers/:id/features", async (req, res) => {
+  app.delete("/api/layers/:id/features", requireAdmin, async (req, res) => {
     const count = await storage.deleteFeaturesByLayer(req.params.id);
     res.json({ deleted: count });
   });
 
-  app.get("/api/layers/:id/features-in-bbox", async (req, res) => {
+  app.get("/api/layers/:id/features-in-bbox", requireAuth, async (req, res) => {
     const { bbox, limit: limitStr } = req.query;
     if (!bbox || typeof bbox !== "string") {
       return res.status(400).json({ message: "bbox required" });
@@ -152,7 +279,7 @@ export async function registerRoutes(
   });
 
   // Grid aggregation for low zoom
-  app.get("/api/layers/:id/aggregate", async (req, res) => {
+  app.get("/api/layers/:id/aggregate", requireAuth, async (req, res) => {
     const { bbox, gridSize } = req.query;
     if (!bbox || typeof bbox !== "string") {
       return res.status(400).json({ message: "bbox required" });
@@ -165,7 +292,7 @@ export async function registerRoutes(
     res.json(grid);
   });
 
-  app.get("/api/layers/:id/boundary-aggregate", async (req, res) => {
+  app.get("/api/layers/:id/boundary-aggregate", requireAuth, async (req, res) => {
     const { bbox, level } = req.query;
     if (!bbox || typeof bbox !== "string" || !level) {
       return res.status(400).json({ message: "bbox and level required" });
@@ -177,7 +304,7 @@ export async function registerRoutes(
   });
 
   // Spatial query: radius search
-  app.get("/api/spatial/radius", async (req, res) => {
+  app.get("/api/spatial/radius", requireAuth, async (req, res) => {
     const { lng, lat, radius, layerIds } = req.query;
     if (!lng || !lat || !radius) {
       return res.status(400).json({ message: "lng, lat, radius required" });
@@ -209,7 +336,7 @@ export async function registerRoutes(
   });
 
   // Spatial query history
-  app.get("/api/spatial/history", async (_req, res) => {
+  app.get("/api/spatial/history", requireAuth, async (_req, res) => {
     const queries = await storage.getSpatialQueries();
     res.json(queries);
   });
@@ -307,12 +434,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/basemaps", async (_req, res) => {
+  app.get("/api/basemaps", requireAuth, async (_req, res) => {
     const list = await storage.getBasemaps();
     res.json(list);
   });
 
-  app.post("/api/basemaps", async (req, res) => {
+  app.post("/api/basemaps", requireAdmin, async (req, res) => {
     try {
       const data = insertBasemapSchema.parse(req.body);
       const basemap = await storage.createBasemap(data);
@@ -322,7 +449,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/basemaps/:id", async (req, res) => {
+  app.patch("/api/basemaps/:id", requireAdmin, async (req, res) => {
     try {
       const allowedFields = insertBasemapSchema.partial().parse(req.body);
       const basemap = await storage.updateBasemap(req.params.id, allowedFields);
@@ -333,31 +460,31 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/basemaps/:id", async (req, res) => {
+  app.delete("/api/basemaps/:id", requireAdmin, async (req, res) => {
     const ok = await storage.deleteBasemap(req.params.id);
     if (!ok) return res.status(404).json({ message: "Basemap not found" });
     res.json({ success: true });
   });
 
-  app.post("/api/basemaps/:id/default", async (req, res) => {
+  app.post("/api/basemaps/:id/default", requireAdmin, async (req, res) => {
     await storage.setDefaultBasemap(req.params.id);
     res.json({ success: true });
   });
 
   // App settings
-  app.get("/api/settings", async (req, res) => {
+  app.get("/api/settings", requireAuth, async (req, res) => {
     const category = req.query.category as string | undefined;
     const settings = await storage.getSettings(category);
     res.json(settings);
   });
 
-  app.get("/api/settings/:key", async (req, res) => {
+  app.get("/api/settings/:key", requireAuth, async (req, res) => {
     const setting = await storage.getSetting(req.params.key);
     if (!setting) return res.status(404).json({ message: "Setting not found" });
     res.json(setting);
   });
 
-  app.put("/api/settings/:key", async (req, res) => {
+  app.put("/api/settings/:key", requireAdmin, async (req, res) => {
     try {
       if (req.body.value === undefined) {
         return res.status(400).json({ message: "value is required" });
@@ -375,18 +502,18 @@ export async function registerRoutes(
   });
 
   // Administrative Boundaries
-  app.get("/api/admin-boundaries", async (req, res) => {
+  app.get("/api/admin-boundaries", requireAuth, async (req, res) => {
     const { level } = req.query;
     const boundaries = await storage.getAdminBoundaries(level as string | undefined);
     res.json(boundaries);
   });
 
-  app.get("/api/admin-boundaries/levels", async (_req, res) => {
+  app.get("/api/admin-boundaries/levels", requireAuth, async (_req, res) => {
     const levels = await storage.getAdminBoundaryLevels();
     res.json(levels);
   });
 
-  app.get("/api/admin-boundaries/geojson", async (req, res) => {
+  app.get("/api/admin-boundaries/geojson", requireAuth, async (req, res) => {
     const { level } = req.query;
     if (!level) return res.status(400).json({ message: "level 파라미터가 필요합니다" });
     const boundaries = await storage.getAdminBoundaries(level as string);
@@ -454,7 +581,7 @@ export async function registerRoutes(
     return geom;
   }
 
-  app.post("/api/admin-boundaries/upload", upload.single("file"), async (req: any, res) => {
+  app.post("/api/admin-boundaries/upload", requireAdmin, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "파일이 필요합니다" });
 
@@ -613,13 +740,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin-boundaries/:level", async (req, res) => {
+  app.delete("/api/admin-boundaries/:level", requireAdmin, async (req, res) => {
     const count = await storage.deleteAdminBoundariesByLevel(req.params.level);
     res.json({ success: true, deleted: count });
   });
 
   // Stats endpoint
-  app.get("/api/stats", async (_req, res) => {
+  app.get("/api/stats", requireAuth, async (_req, res) => {
     const allLayers = await storage.getLayers();
     const totalFeatures = allLayers.reduce((sum, l) => sum + l.featureCount, 0);
     res.json({
@@ -633,7 +760,7 @@ export async function registerRoutes(
   const MIGRATE_TOKEN = "5ccade24-da86-45e8-bc19-59ddafaf3556";
 
   // 피처 배치 임포트 (id 제공 시 그대로 사용 → 멱등성 보장)
-  app.post("/api/admin/import-features", async (req, res) => {
+  app.post("/api/admin/import-features", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -694,7 +821,7 @@ export async function registerRoutes(
   });
 
   // 레이어 피처 전체 삭제 (재마이그레이션 전 정리용)
-  app.post("/api/admin/clear-layer", async (req, res) => {
+  app.post("/api/admin/clear-layer", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -710,7 +837,7 @@ export async function registerRoutes(
   });
 
   // 행정경계 배치 임포트 (id 보존)
-  app.post("/api/admin/import-boundaries", async (req, res) => {
+  app.post("/api/admin/import-boundaries", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -763,7 +890,7 @@ export async function registerRoutes(
   });
 
   // 경계 집계 캐시 빌드 (레이어×레벨 단위, 기존 캐시 삭제 후 재계산)
-  app.post("/api/admin/build-boundary-cache", async (req, res) => {
+  app.post("/api/admin/build-boundary-cache", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -784,7 +911,7 @@ export async function registerRoutes(
   });
 
   // 공간인덱스 생성
-  app.post("/api/admin/create-indexes", async (req, res) => {
+  app.post("/api/admin/create-indexes", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -812,7 +939,7 @@ export async function registerRoutes(
   });
 
   // 레이어 통계 재계산
-  app.post("/api/admin/sync-layer-stats", async (req, res) => {
+  app.post("/api/admin/sync-layer-stats", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }

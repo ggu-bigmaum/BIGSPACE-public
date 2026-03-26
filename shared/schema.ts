@@ -8,6 +8,8 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role").notNull().default("viewer"), // "admin" | "viewer"
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -17,6 +19,22 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// ── 감사 추적 로그 (GS 인증 1-4) ────────────────────────────────────
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  username: text("username"),
+  action: text("action").notNull(),           // "LOGIN" | "LOGOUT" | "CREATE" | "UPDATE" | "DELETE" | "UPLOAD" etc.
+  resource: text("resource"),                  // "layer" | "feature" | "settings" etc.
+  resourceId: varchar("resource_id"),
+  ip: text("ip").notNull(),
+  userAgent: text("user_agent"),
+  details: jsonb("details"),                   // 추가 정보 (변경 전/후 등)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
 
 export const layers = pgTable("layers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

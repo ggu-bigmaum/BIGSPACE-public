@@ -31,7 +31,7 @@ import {
 import {
   Layers, Map, Download, Settings2, Globe, Info, Cpu, CircleDot,
   Siren, Landmark, Car, Building2, TreePine, Users, Package, Zap, Hash,
-  Pencil, Trash2, Plus, Check,
+  Pencil, Trash2, Plus, Check, LogOut, User,
 } from "lucide-react";
 import {
   Tooltip,
@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { LAYER_PALETTE } from "@/lib/colorPalette";
 
 interface AppSidebarProps {
@@ -94,6 +95,60 @@ const BADGE_KO: Record<string, string> = { VECTOR: "벡터", RASTER: "래스터"
 const BADGE_TOOLTIP: Record<string, string> = {
   VECTOR: "Vector Data Source", RASTER: "Raster Data Source", DEM: "Digital Elevation Model", HEATMAP: "Heatmap Layer",
 };
+
+function UserFooter({ onSettingsOpen, closeMobileIfNeeded }: { onSettingsOpen?: () => void; closeMobileIfNeeded: () => void }) {
+  const { user, logoutMutation } = useAuth();
+
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5 flex-1 min-w-0 px-1">
+        <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <span className="text-xs text-muted-foreground truncate">
+          {user?.username}
+          {user?.role === "admin" && (
+            <span className="ml-1 text-teal-600 font-medium">(관리자)</span>
+          )}
+        </span>
+      </div>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" data-testid="button-export-data">
+              <Download className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">데이터 내보내기</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => { onSettingsOpen?.(); closeMobileIfNeeded(); }} data-testid="button-open-settings">
+              <Settings2 className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">시스템 설정</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">로그아웃</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
+}
 
 function LayerEditSheet({
   layer,
@@ -745,38 +800,8 @@ export function AppSidebar({
         </SidebarContent>
 
         <Separator />
-        <SidebarFooter className="p-2 flex flex-row items-center justify-end gap-1">
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  data-testid="button-export-data"
-                >
-                  <Download className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">데이터 내보내기</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => { onSettingsOpen?.(); closeMobileIfNeeded(); }}
-                  data-testid="button-open-settings"
-                >
-                  <Settings2 className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">시스템 설정</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        <SidebarFooter className="p-2 space-y-1">
+          <UserFooter onSettingsOpen={onSettingsOpen} closeMobileIfNeeded={closeMobileIfNeeded} />
         </SidebarFooter>
       </Sidebar>
 
