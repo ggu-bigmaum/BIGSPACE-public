@@ -164,9 +164,11 @@ export function useLayerRenderer(
         existingWfs.setOpacity(layer.opacity);
       } else {
         const wfsTypeName = layer.wfsLayers;
+        console.log(`[WFS] Creating layer: ${layer.name}, typeName: ${wfsTypeName}`);
         const wfsSource = new VectorSource({
           format: new GeoJSON(),
           loader: (extent, _resolution, projection, success, failure) => {
+            console.log(`[WFS] Loader called for ${layer.name}, extent:`, extent);
             const [minLon, minLat, maxLon, maxLat] = transformExtent(extent, projection, "EPSG:4326");
             // WFS 1.1.0 + EPSG:4326: 축 순서가 lat,lon (VWorld 표준)
             const params = new URLSearchParams({
@@ -180,13 +182,26 @@ export function useLayerRenderer(
               MAXFEATURES: "500",
             });
             fetch(`/api/proxy/wfs?${params.toString()}`)
-              .then(r => r.json())
+              .then(r => {
+                if (!r.ok) throw new Error(`WFS proxy error: ${r.status}`);
+                return r.json();
+              })
               .then(data => {
-                const features = new GeoJSON().readFeatures(data, { featureProjection: "EPSG:3857" });
+                // VWorld WFS 응답에 urn:ogc:def:crs:EPSG::4326 CRS가 포함되어
+                // OL이 좌표축 해석을 잘못할 수 있으므로 제거
+                if (data.crs) delete data.crs;
+                const features = new GeoJSON().readFeatures(data, {
+                  dataProjection: "EPSG:4326",
+                  featureProjection: "EPSG:3857",
+                });
+                console.log(`[WFS] ${layer.name}: ${features.length} features loaded`);
                 wfsSource.addFeatures(features);
                 success?.(features);
               })
-              .catch(() => failure?.());
+              .catch((err) => {
+                console.error(`[WFS] ${layer.name} load failed:`, err);
+                failure?.();
+              });
           },
           strategy: bboxStrategy,
         });
