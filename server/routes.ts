@@ -12,7 +12,7 @@ import * as fs from "fs";
 import * as https from "https";
 import * as shapefile from "shapefile";
 import passport from "passport";
-import { hashPassword, requireAuth, requireAdmin } from "./auth";
+import { hashPassword, requireAuth } from "./auth";
 
 const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 1024 * 1024 * 1024 } }); // 1GB
 
@@ -179,7 +179,7 @@ export async function registerRoutes(
   });
 
   /** 감사 로그 조회 (admin only) */
-  app.get("/api/admin/audit-logs", requireAdmin, async (req: Request, res: Response) => {
+  app.get("/api/admin/audit-logs", requireAuth, async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
     const offset = parseInt(req.query.offset as string) || 0;
     const result = await pool.query(
@@ -203,7 +203,7 @@ export async function registerRoutes(
     res.json(layer);
   });
 
-  app.post("/api/layers", requireAdmin, async (req, res) => {
+  app.post("/api/layers", requireAuth, async (req, res) => {
     try {
       const data = insertLayerSchema.parse(req.body);
       const layer = await storage.createLayer(data);
@@ -232,7 +232,7 @@ export async function registerRoutes(
     tileMaxZoom: z.number().int().min(0).max(22).optional(),
   }).strict();
 
-  app.patch("/api/layers/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/layers/:id", requireAuth, async (req, res) => {
     const parsed = layerUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "잘못된 요청 데이터", errors: parsed.error.flatten() });
@@ -243,7 +243,7 @@ export async function registerRoutes(
     res.json(layer);
   });
 
-  app.delete("/api/layers/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/layers/:id", requireAuth, async (req, res) => {
     const ok = await storage.deleteLayer(req.params.id);
     if (!ok) return res.status(404).json({ message: "Layer not found" });
     writeAuditLog(req, "DELETE", "layer", req.params.id);
@@ -281,7 +281,7 @@ export async function registerRoutes(
     });
   });
 
-  app.post("/api/layers/:id/features", requireAdmin, async (req, res) => {
+  app.post("/api/layers/:id/features", requireAuth, async (req, res) => {
     try {
       const layer = await storage.getLayer(req.params.id);
       if (!layer) return res.status(404).json({ message: "Layer not found" });
@@ -307,7 +307,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/layers/:id/features", requireAdmin, async (req, res) => {
+  app.delete("/api/layers/:id/features", requireAuth, async (req, res) => {
     const count = await storage.deleteFeaturesByLayer(req.params.id);
     res.json({ deleted: count });
   });
@@ -485,7 +485,7 @@ export async function registerRoutes(
     res.json(list);
   });
 
-  app.post("/api/basemaps", requireAdmin, async (req, res) => {
+  app.post("/api/basemaps", requireAuth, async (req, res) => {
     try {
       const data = insertBasemapSchema.parse(req.body);
       const basemap = await storage.createBasemap(data);
@@ -495,7 +495,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/basemaps/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/basemaps/:id", requireAuth, async (req, res) => {
     try {
       const allowedFields = insertBasemapSchema.partial().parse(req.body);
       const basemap = await storage.updateBasemap(req.params.id, allowedFields);
@@ -506,13 +506,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/basemaps/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/basemaps/:id", requireAuth, async (req, res) => {
     const ok = await storage.deleteBasemap(req.params.id);
     if (!ok) return res.status(404).json({ message: "Basemap not found" });
     res.json({ success: true });
   });
 
-  app.post("/api/basemaps/:id/default", requireAdmin, async (req, res) => {
+  app.post("/api/basemaps/:id/default", requireAuth, async (req, res) => {
     await storage.setDefaultBasemap(req.params.id);
     res.json({ success: true });
   });
@@ -530,7 +530,7 @@ export async function registerRoutes(
     res.json(setting);
   });
 
-  app.put("/api/settings/:key", requireAdmin, async (req, res) => {
+  app.put("/api/settings/:key", requireAuth, async (req, res) => {
     try {
       if (req.body.value === undefined) {
         return res.status(400).json({ message: "value is required" });
@@ -627,7 +627,7 @@ export async function registerRoutes(
     return geom;
   }
 
-  app.post("/api/admin-boundaries/upload", requireAdmin, upload.single("file"), async (req: any, res) => {
+  app.post("/api/admin-boundaries/upload", requireAuth, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "파일이 필요합니다" });
 
@@ -786,7 +786,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin-boundaries/:level", requireAdmin, async (req, res) => {
+  app.delete("/api/admin-boundaries/:level", requireAuth, async (req, res) => {
     const count = await storage.deleteAdminBoundariesByLevel(req.params.level);
     res.json({ success: true, deleted: count });
   });
@@ -806,7 +806,7 @@ export async function registerRoutes(
   const MIGRATE_TOKEN = "5ccade24-da86-45e8-bc19-59ddafaf3556";
 
   // 피처 배치 임포트 (id 제공 시 그대로 사용 → 멱등성 보장)
-  app.post("/api/admin/import-features", requireAdmin, async (req, res) => {
+  app.post("/api/admin/import-features", requireAuth, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -867,7 +867,7 @@ export async function registerRoutes(
   });
 
   // 레이어 피처 전체 삭제 (재마이그레이션 전 정리용)
-  app.post("/api/admin/clear-layer", requireAdmin, async (req, res) => {
+  app.post("/api/admin/clear-layer", requireAuth, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -883,7 +883,7 @@ export async function registerRoutes(
   });
 
   // 행정경계 배치 임포트 (id 보존)
-  app.post("/api/admin/import-boundaries", requireAdmin, async (req, res) => {
+  app.post("/api/admin/import-boundaries", requireAuth, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -936,7 +936,7 @@ export async function registerRoutes(
   });
 
   // 경계 집계 캐시 빌드 (레이어×레벨 단위, 기존 캐시 삭제 후 재계산)
-  app.post("/api/admin/build-boundary-cache", requireAdmin, async (req, res) => {
+  app.post("/api/admin/build-boundary-cache", requireAuth, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -957,7 +957,7 @@ export async function registerRoutes(
   });
 
   // 공간인덱스 생성
-  app.post("/api/admin/create-indexes", requireAdmin, async (req, res) => {
+  app.post("/api/admin/create-indexes", requireAuth, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -985,7 +985,7 @@ export async function registerRoutes(
   });
 
   // 레이어 통계 재계산
-  app.post("/api/admin/sync-layer-stats", requireAdmin, async (req, res) => {
+  app.post("/api/admin/sync-layer-stats", requireAuth, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
