@@ -100,30 +100,55 @@ pg_restore -h localhost -U bigspace -d bigspace -F c /home/rocky/bigspace.dump
 
 ## 4단계: 앱 배포
 
-### 코드 클론
+### 최초 배포 (클론)
 ```bash
 cd ~
-git clone https://github.com/your-repo/bigspace.git
-cd bigspace
+git clone https://github.com/ggu-bigmaum/BIGSPACE-public.git
+cd BIGSPACE-public
 ```
 
 > GitHub Personal Access Token 필요 시: 비밀번호 입력란에 토큰 입력
 
-### .env 파일 생성
+### .env 파일 생성 (최초 1회)
 ```bash
 cat > .env << 'EOF'
-DATABASE_URL=postgresql://bigspace:비밀번호@localhost:5432/bigspace
-VITE_VWORLD_KEY=발급받은키
+DATABASE_URL=postgresql://postgres:0000@localhost:5432/bigspace
+VITE_VWORLD_KEY=F1307A7E-E3D0-384E-AF67-0B3AD0976CF8
 VWORLD_DOMAIN=168.107.19.25
+SESSION_SECRET=bigspace-prod-secret-2026
+PORT=5000
+VITE_FIREBASE_API_KEY=AIzaSyDNgEv4ScFG18TgzSHNxmxDpQy26Pkti0Y
+VITE_FIREBASE_AUTH_DOMAIN=bigspace-public.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=bigspace-public
 EOF
 ```
+
+> ⚠️ `.env`는 git에 포함되지 않아 클론 시 매번 직접 생성해야 합니다.
 
 ### 패키지 설치 및 실행
 ```bash
 npm install
+npm run build
 pm2 start npm --name bigspace -- run start
 pm2 save
 pm2 startup
+```
+
+---
+
+### 코드 업데이트 (이후)
+
+> 클론은 `.env`가 사라지므로 사용하지 않습니다. 항상 pull 사용.
+
+> ⚠️ **`npm run build` 절대 빠뜨리지 마세요. 빌드 없이 재시작하면 이전 코드가 그대로 실행됩니다.**
+
+```bash
+cd ~/BIGSPACE-public
+git checkout -- package-lock.json
+git pull
+npm install
+npm run build
+pm2 restart bigspace
 ```
 
 ---
