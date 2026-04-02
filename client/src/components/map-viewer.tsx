@@ -196,11 +196,11 @@ export function MapViewer({
       <div ref={naverMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none", pointerEvents: "none" }} data-testid="naver-map-container" />
       <div ref={mapRef} className="absolute inset-0 z-[1]" data-testid="map-container" />
 
-      {layerList.some(l => l.visible && (l.wmsUrl || l.wfsUrl)) && mapView.zoom < 12 && (
+      {layerList.some(l => l.visible && (l.wmsUrl || l.wfsUrl)) && mapView.zoom < 11 && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
           <div className="bg-black/70 text-white/90 backdrop-blur-sm rounded-md px-3 py-1.5 shadow-lg flex items-center gap-1.5 text-[11px]">
             <ZoomIn className="w-3.5 h-3.5 flex-shrink-0" />
-            WMS/WFS 레이어는 줌 12 이상에서만 표시됩니다
+            WMS/WFS 레이어는 줌 레벨을 높이면 표시됩니다
           </div>
         </div>
       )}

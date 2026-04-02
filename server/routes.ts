@@ -122,6 +122,53 @@ export async function registerRoutes(
     });
   });
 
+  /** Google 로그인 (Firebase ID 토큰 검증) */
+  app.post("/api/auth/google", async (req: Request, res: Response) => {
+    try {
+      const { idToken } = req.body;
+      if (!idToken) return res.status(400).json({ message: "토큰이 없습니다." });
+
+      // Firebase REST API로 토큰 검증
+      const firebaseRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.VITE_FIREBASE_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        }
+      );
+      const firebaseData = await firebaseRes.json();
+      if (!firebaseRes.ok || !firebaseData.users?.[0]) {
+        return res.status(401).json({ message: "유효하지 않은 Google 토큰입니다." });
+      }
+
+      const googleUser = firebaseData.users[0];
+      const email = googleUser.email;
+      if (!email) return res.status(400).json({ message: "이메일 정보가 없습니다." });
+
+      // 기존 유저 조회 또는 신규 생성
+      let user = await storage.getUserByUsername(email);
+      if (!user) {
+        const countResult = await pool.query("SELECT COUNT(*)::int AS cnt FROM users");
+        const isFirst = countResult.rows[0].cnt === 0;
+        user = await storage.createUser({ username: email, password: "" });
+        if (isFirst) {
+          await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [user.id]);
+          user.role = "admin";
+        }
+      }
+
+      req.login(user, (err) => {
+        if (err) return res.status(500).json({ message: "세션 생성 실패" });
+        writeAuditLog(req, "LOGIN_GOOGLE", "user", user!.id);
+        const { password: _, ...safeUser } = user as any;
+        return res.json(safeUser);
+      });
+    } catch (e: any) {
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
   /** 현재 사용자 조회 */
   app.get("/api/auth/me", (req: Request, res: Response) => {
     if (!req.isAuthenticated || !req.isAuthenticated()) {

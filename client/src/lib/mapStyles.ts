@@ -2,13 +2,22 @@ import { Style, Fill, Stroke, Circle as CircleStyle, Text as TextStyle } from "o
 import type { Layer } from "@shared/schema";
 
 export function getLayerStyle(layer: Layer) {
+  const gtype = layer.geometryType?.toLowerCase() || "";
+  const isPoint = gtype.includes("point");
+  const isLine = gtype.includes("line");
+
   return new Style({
-    fill: new Fill({ color: layer.fillColor }),
+    // Polygon/MultiPolygon: fill + stroke
+    ...((!isPoint && !isLine) && { fill: new Fill({ color: layer.fillColor }) }),
+    // Polygon + LineString: stroke
     stroke: new Stroke({ color: layer.strokeColor, width: layer.strokeWidth }),
-    image: new CircleStyle({
-      radius: layer.pointRadius,
-      fill: new Fill({ color: layer.fillColor }),
-      stroke: new Stroke({ color: layer.strokeColor, width: layer.strokeWidth }),
+    // Point/MultiPoint: circle marker
+    ...(isPoint && {
+      image: new CircleStyle({
+        radius: layer.pointRadius,
+        fill: new Fill({ color: layer.fillColor }),
+        stroke: new Stroke({ color: layer.strokeColor, width: layer.strokeWidth }),
+      }),
     }),
   });
 }

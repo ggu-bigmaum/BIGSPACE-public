@@ -206,7 +206,7 @@ export function useLayerRenderer(
           strategy: bboxStrategy,
         });
         const style = getLayerStyle(layer);
-        const vl = new VectorLayer({ source: wfsSource, style, zIndex: 8, opacity: layer.opacity, minZoom: 11 });
+        const vl = new VectorLayer({ source: wfsSource, style, zIndex: 8, opacity: layer.opacity, minZoom: layer.minZoomForFeatures ?? 11 });
         vl.setVisible(layer.visible);
         mapInstance.current?.addLayer(vl);
         wfsLayersRef.current.set(layer.id, vl);
@@ -222,10 +222,10 @@ export function useLayerRenderer(
       } else {
         const wmsSource = new TileWMS({
           url: "/api/proxy/wms",
-          params: { LAYERS: layer.wmsLayers, FORMAT: "image/png", TRANSPARENT: "TRUE", VERSION: "1.3.0" },
+          params: { LAYERS: layer.wmsLayers, FORMAT: "image/png", TRANSPARENT: "TRUE", VERSION: "1.3.0", CRS: "EPSG:4326" },
           crossOrigin: "anonymous",
         });
-        const tl = new TileLayer({ source: wmsSource, zIndex: 9, opacity: layer.opacity, minZoom: 11 });
+        const tl = new TileLayer({ source: wmsSource, zIndex: 9, opacity: layer.opacity, minZoom: layer.minZoomForFeatures ?? 11 });
         tl.setVisible(layer.visible);
         mapInstance.current?.addLayer(tl);
         wmsLayersRef.current.set(layer.id, tl);

@@ -27,6 +27,12 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Firebase 팝업 로그인을 위한 COOP 헤더
+app.use((_req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
+
 // ── 인증 시스템 (Passport + 세션) ──
 setupAuth(app);
 
