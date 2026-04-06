@@ -1,41 +1,68 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "system";
+type ResolvedTheme = "light" | "dark";
 
-const ThemeContext = createContext<{
+interface ThemeContextType {
   theme: Theme;
+  resolvedTheme: ResolvedTheme;
   setTheme: (theme: Theme) => void;
-  toggleTheme: () => void;
-}>({
+}
+
+const ThemeContext = createContext<ThemeContextType>({
   theme: "light",
+  resolvedTheme: "light",
   setTheme: () => {},
-  toggleTheme: () => {},
 });
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("theme") as Theme) || "light";
-    }
-    return "light";
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function resolveTheme(theme: Theme): ResolvedTheme {
+  return theme === "system" ? getSystemTheme() : theme;
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
+    return (localStorage.getItem("theme") as Theme) || "light";
   });
 
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
+    resolveTheme(typeof window === "undefined" ? "light" : (localStorage.getItem("theme") as Theme) || "light")
+  );
+
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(theme);
-    localStorage.setItem("theme", theme);
+    const resolved = resolveTheme(theme);
+    setResolvedTheme(resolved);
+    document.documentElement.classList.toggle("dark", resolved === "dark");
+
+    if (theme === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => {
+        const r = resolveTheme("system");
+        setResolvedTheme(r);
+        document.documentElement.classList.toggle("dark", r === "dark");
+      };
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    }
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === "light" ? "dark" : "light");
+  const setTheme = (t: Theme) => {
+    setThemeState(t);
+    localStorage.setItem("theme", t);
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 }
 
-export const useTheme = () => useContext(ThemeContext);
+export function useTheme() {
+  return useContext(ThemeContext);
+}

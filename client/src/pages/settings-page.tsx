@@ -460,7 +460,7 @@ export default function SettingsPopup({ open, onClose }: SettingsPopupProps) {
   );
 }
 
-function GeneralSection({ theme, setTheme }: { theme: string; setTheme: (t: "light" | "dark") => void }) {
+function GeneralSection({ theme, setTheme }: { theme: string; setTheme: (t: "light" | "dark" | "system") => void }) {
   const [badgeStyle, setBadgeStyle] = useState(() => localStorage.getItem("layerBadgeStyle") || "dot");
 
   const handleBadgeStyleChange = (style: string) => {
