@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useMutation } from "@tanstack/react-query";
-import { Layers } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Layers, ChevronUp } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Basemap } from "@shared/schema";
 
@@ -19,31 +18,35 @@ export function BasemapPicker() {
   const activeBasemap = enabledBasemaps.find(b => b.isDefault) || enabledBasemaps[0];
 
   return (
-    <div className="absolute bottom-3 left-3 z-10">
+    <div className="absolute bottom-3 right-20 z-10">
       <div className="relative" ref={pickerRef}>
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm text-white/70 hover:text-white border border-white/10 text-[10px] px-2.5 py-1 rounded-md font-normal transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 bg-background/90 backdrop-blur-md border border-border rounded-lg shadow-md text-[12px] text-foreground hover:bg-accent transition-colors"
           data-testid="button-basemap-picker"
         >
-          <Layers className="w-3 h-3" />
-          {activeBasemap?.name || "배경지도"}
+          <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+          <span>{activeBasemap?.name || "배경지도"}</span>
+          <ChevronUp className={`w-3 h-3 text-muted-foreground transition-transform ${open ? "" : "rotate-180"}`} />
         </button>
 
         {open && enabledBasemaps.length > 0 && (
-          <div className="absolute bottom-full left-0 mb-1 bg-black/80 backdrop-blur-md rounded-md border border-white/10 py-1 min-w-[160px]">
+          <div className="absolute bottom-full mb-2 right-0 bg-background border border-border rounded-lg shadow-lg p-2 flex gap-2">
             {enabledBasemaps.map((bm) => (
               <button
                 key={bm.id}
-                className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                className={`flex flex-col items-center gap-1 p-1.5 rounded-md transition-colors ${
                   bm.id === activeBasemap?.id
-                    ? "text-cyan-400 bg-white/10"
-                    : "text-white/70 hover:text-white hover:bg-white/5"
+                    ? "ring-2 ring-primary bg-accent"
+                    : "hover:bg-accent"
                 }`}
                 onClick={() => { setDefaultMutation.mutate(bm.id); setOpen(false); }}
                 data-testid={`button-select-basemap-${bm.id}`}
               >
-                {bm.name}
+                <div className="w-16 h-16 rounded bg-muted overflow-hidden flex items-center justify-center">
+                  <span className="text-[10px] text-muted-foreground font-medium">{bm.name.slice(0, 6)}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground leading-none">{bm.name}</span>
               </button>
             ))}
           </div>
@@ -53,7 +56,6 @@ export function BasemapPicker() {
   );
 }
 
-// Export activeBasemap for parent to use in basemap sync logic
 export function useActiveBasemap() {
   const { data: basemapList = [] } = useQuery<Basemap[]>({ queryKey: ["/api/basemaps"] });
   const enabledBasemaps = basemapList.filter(b => b.enabled);

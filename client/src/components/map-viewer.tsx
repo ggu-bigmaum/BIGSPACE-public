@@ -196,11 +196,11 @@ export function MapViewer({
       <div ref={naverMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none", pointerEvents: "none" }} data-testid="naver-map-container" />
       <div ref={mapRef} className="absolute inset-0 z-[1]" data-testid="map-container" />
 
-      {layerList.some(l => l.visible && (l.wmsUrl || l.wfsUrl)) && mapView.zoom < 11 && (
+      {layerList.some(l => l.visible && (l.wmsUrl || l.wfsUrl) && mapView.zoom < (l.minZoomForFeatures || 11)) && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-          <div className="bg-black/70 text-white/90 backdrop-blur-sm rounded-md px-3 py-1.5 shadow-lg flex items-center gap-1.5 text-[11px]">
+          <div className="bg-background/90 backdrop-blur-sm text-muted-foreground border border-border rounded-md px-3 py-1.5 shadow-md flex items-center gap-1.5 text-[11px]">
             <ZoomIn className="w-3.5 h-3.5 flex-shrink-0" />
-            WMS/WFS 레이어는 줌 레벨을 높이면 표시됩니다
+            WMS/WFS 레이어는 확대하면 표시됩니다
           </div>
         </div>
       )}
@@ -224,7 +224,7 @@ export function MapViewer({
         <Button
           size="icon" variant="ghost"
           onClick={() => { setMapToolMode("select"); selectionLayerRef.current?.getSource()?.clear(); onBoxSelect?.(undefined as any); }}
-          className={`w-8 h-8 backdrop-blur-sm border border-white/10 ${mapToolMode === "select" ? "bg-cyan-600/60 text-white" : "bg-black/60 text-white/70 hover:text-white"}`}
+          className={`w-8 h-8 rounded-lg shadow-sm ${mapToolMode === "select" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border border-border hover:bg-accent"}`}
           data-testid="button-tool-select" title="이동/선택"
         >
           <MousePointer className="w-4 h-4" />
@@ -232,7 +232,7 @@ export function MapViewer({
         <Button
           size="icon" variant="ghost"
           onClick={() => setMapToolMode("boxSelect")}
-          className={`w-8 h-8 backdrop-blur-sm border border-white/10 ${mapToolMode === "boxSelect" ? "bg-cyan-600/60 text-white" : "bg-black/60 text-white/70 hover:text-white"}`}
+          className={`w-8 h-8 rounded-lg shadow-sm ${mapToolMode === "boxSelect" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border border-border hover:bg-accent"}`}
           data-testid="button-tool-box-select" title="영역 선택"
         >
           <BoxSelect className="w-4 h-4" />
