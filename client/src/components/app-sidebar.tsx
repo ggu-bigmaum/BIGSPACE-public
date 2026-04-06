@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Layer } from "@shared/schema";
@@ -11,13 +11,12 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarHeader,
-  SidebarFooter,
+  SidebarFooter as SidebarFooterWrapper,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
@@ -29,9 +28,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Layers, Map, Download, Settings2, Globe, Info, Cpu, CircleDot,
-  Siren, Landmark, Car, Building2, TreePine, Users, Package, Zap, Hash,
-  Pencil, Trash2, Plus, Check, LogOut, User,
+  Layers, Map, Globe, Info, Cpu, CircleDot,
+  Trash2, Plus, Check,
 } from "lucide-react";
 import {
   Tooltip,
@@ -44,6 +42,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { LAYER_PALETTE } from "@/lib/colorPalette";
 
+import { LayerGroup } from "@/components/sidebar/LayerGroup";
+import { LayerSearch } from "@/components/sidebar/LayerSearch";
+import { SidebarFooterContent } from "@/components/sidebar/SidebarFooter";
+
+// ────────────────────────────────────────────────────────────────────
+// Props (unchanged public interface)
+// ────────────────────────────────────────────────────────────────────
+
 interface AppSidebarProps {
   onLayerToggle?: (layerId: string, visible: boolean) => void;
   onLayerSelect?: (layerId: string | null) => void;
@@ -54,101 +60,9 @@ interface AppSidebarProps {
   selectedLayerId?: string | null;
 }
 
-function getLayerTypeBadge(layer: Layer): string {
-  const rm = layer.renderMode?.toLowerCase() ?? "";
-  if (rm === "heatmap") return "HEATMAP";
-  if (rm === "raster" || rm === "tile") return "RASTER";
-  if (rm === "dem") return "DEM";
-  return "VECTOR";
-}
-
-function getLayerSizeLabel(layer: Layer): string {
-  if (layer.wmsUrl) return "WMS";
-  if (layer.renderMode === "tile" || layer.renderMode === "heatmap") return "Stream";
-  const count = layer.featureCount ?? 0;
-  if (count > 100000) return `${Math.round(count / 1000)}K`;
-  if (count > 1000) return `${(count / 1000).toFixed(1)}K`;
-  return `${count}`;
-}
-
-const BADGE_COLOR_SOLID: Record<string, string> = {
-  VECTOR: "bg-emerald-500", RASTER: "bg-violet-500", DEM: "bg-amber-500", HEATMAP: "bg-rose-500",
-};
-const BADGE_COLOR_LIGHT: Record<string, string> = {
-  VECTOR: "bg-emerald-500/15 text-emerald-500 border-emerald-500/25",
-  RASTER: "bg-violet-500/15 text-violet-500 border-violet-500/25",
-  DEM: "bg-amber-500/15 text-amber-500 border-amber-500/25",
-  HEATMAP: "bg-rose-500/15 text-rose-500 border-rose-500/25",
-};
-const BADGE_COLOR_TEXT: Record<string, string> = {
-  VECTOR: "text-emerald-400", RASTER: "text-violet-400", DEM: "text-amber-400", HEATMAP: "text-rose-400",
-};
-const BADGE_COLOR_DOT: Record<string, string> = {
-  VECTOR: "bg-emerald-400", RASTER: "bg-violet-400", DEM: "bg-amber-400", HEATMAP: "bg-rose-400",
-};
-const BADGE_GRADIENT: Record<string, string> = {
-  VECTOR: "from-emerald-500 to-teal-400", RASTER: "from-violet-500 to-purple-400",
-  DEM: "from-amber-500 to-orange-400", HEATMAP: "from-rose-500 to-pink-400",
-};
-const BADGE_SHORT: Record<string, string> = { VECTOR: "V", RASTER: "R", DEM: "D", HEATMAP: "H" };
-const BADGE_KO: Record<string, string> = { VECTOR: "벡터", RASTER: "래스터", DEM: "DEM", HEATMAP: "히트맵" };
-const BADGE_TOOLTIP: Record<string, string> = {
-  VECTOR: "Vector Data Source", RASTER: "Raster Data Source", DEM: "Digital Elevation Model", HEATMAP: "Heatmap Layer",
-};
-
-function UserFooter({ onSettingsOpen, closeMobileIfNeeded }: { onSettingsOpen?: () => void; closeMobileIfNeeded: () => void }) {
-  const { user, logoutMutation } = useAuth();
-
-  return (
-    <div className="flex items-center gap-1">
-      <div className="flex items-center gap-1.5 flex-1 min-w-0 px-1">
-        <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-        <span className="text-xs text-muted-foreground truncate">
-          {user?.username}
-          {user?.role === "admin" && (
-            <span className="ml-1 text-teal-600 font-medium">(관리자)</span>
-          )}
-        </span>
-      </div>
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" data-testid="button-export-data">
-              <Download className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">데이터 내보내기</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => { onSettingsOpen?.(); closeMobileIfNeeded(); }} data-testid="button-open-settings">
-              <Settings2 className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">시스템 설정</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">로그아웃</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
-  );
-}
+// ────────────────────────────────────────────────────────────────────
+// LayerEditSheet (kept as-is — complex edit panel)
+// ────────────────────────────────────────────────────────────────────
 
 function LayerEditSheet({
   layer,
@@ -447,6 +361,10 @@ function LayerEditSheet({
   );
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Main sidebar component
+// ────────────────────────────────────────────────────────────────────
+
 export function AppSidebar({
   onLayerToggle,
   onLayerSelect,
@@ -459,18 +377,15 @@ export function AppSidebar({
   const { toast } = useToast();
   const { setOpenMobile, isMobile } = useSidebar();
 
-  const closeMobileIfNeeded = () => {
+  const closeMobileIfNeeded = useCallback(() => {
     if (isMobile) setOpenMobile(false);
-  };
-  const [badgeStyle, setBadgeStyle] = useState(() => localStorage.getItem("layerBadgeStyle") || "dot");
+  }, [isMobile, setOpenMobile]);
+
   const [editingLayer, setEditingLayer] = useState<Layer | null>(null);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    const handler = (e: Event) => setBadgeStyle((e as CustomEvent).detail);
-    window.addEventListener("badgeStyleChange", handler);
-    return () => window.removeEventListener("badgeStyleChange", handler);
-  }, []);
+  // ── Data fetching ──────────────────────────────────────────────
 
   const { data: layersData, isLoading } = useQuery<Layer[]>({
     queryKey: ["/api/layers"],
@@ -499,15 +414,65 @@ export function AppSidebar({
     },
   });
 
-  const handleEditOpen = (layer: Layer, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingLayer(layer);
-    setEditSheetOpen(true);
-  };
+  // ── Callbacks for sub-components ───────────────────────────────
+
+  const handleToggle = useCallback(
+    (layerId: string, visible: boolean) => {
+      updateMutation.mutate({ id: layerId, updates: { visible } });
+      onLayerToggle?.(layerId, visible);
+    },
+    [updateMutation, onLayerToggle],
+  );
+
+  const handleSelect = useCallback(
+    (layerId: string | null) => {
+      onLayerSelect?.(layerId);
+      closeMobileIfNeeded();
+    },
+    [onLayerSelect, closeMobileIfNeeded],
+  );
+
+  const handleEditOpen = useCallback(
+    (layer: Layer, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEditingLayer(layer);
+      setEditSheetOpen(true);
+    },
+    [],
+  );
+
+  const handleDelete = useCallback(
+    (layerId: string) => {
+      deleteMutation.mutate(layerId);
+    },
+    [deleteMutation],
+  );
+
+  // ── Grouped + filtered layers ──────────────────────────────────
+
+  const grouped = useMemo(() => {
+    if (!layersData) return {};
+    const q = searchQuery.toLowerCase();
+    const filtered = q
+      ? layersData.filter((l) => l.name.toLowerCase().includes(q))
+      : layersData;
+
+    return filtered.reduce<Record<string, Layer[]>>((acc, layer) => {
+      const cat = layer.category || "기타";
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(layer);
+      return acc;
+    }, {});
+  }, [layersData, searchQuery]);
+
+  const categories = Object.keys(grouped);
+
+  // ── Render ─────────────────────────────────────────────────────
 
   return (
     <>
       <Sidebar>
+        {/* Header */}
         <SidebarHeader className="p-4 pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -524,12 +489,7 @@ export function AppSidebar({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Link href="/product-info">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        data-testid="button-product-info"
-                      >
+                      <Button variant="ghost" size="icon" className="h-7 w-7" data-testid="button-product-info">
                         <Info className="w-4 h-4" />
                       </Button>
                     </Link>
@@ -541,9 +501,7 @@ export function AppSidebar({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
+                      variant="ghost" size="icon" className="h-7 w-7"
                       onClick={() => { onRadiusOpen?.(); closeMobileIfNeeded(); }}
                       data-testid="button-radius-search"
                     >
@@ -557,9 +515,7 @@ export function AppSidebar({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
+                      variant="ghost" size="icon" className="h-7 w-7"
                       onClick={() => { onAnalysisOpen?.(); closeMobileIfNeeded(); }}
                       data-testid="button-spatial-analysis"
                     >
@@ -575,6 +531,10 @@ export function AppSidebar({
 
         <Separator />
 
+        {/* Search */}
+        <LayerSearch value={searchQuery} onChange={setSearchQuery} />
+
+        {/* Layer content */}
         <SidebarContent className="overflow-y-auto scrollbar-none">
           <SidebarGroup>
             <SidebarGroupLabel className="flex items-center justify-between px-2.5 py-1.5">
@@ -586,9 +546,7 @@ export function AppSidebar({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 rounded"
+                      variant="ghost" size="icon" className="h-5 w-5 rounded"
                       onClick={() => { onAddLayer?.(); closeMobileIfNeeded(); }}
                       data-testid="button-add-layer-sidebar"
                     >
@@ -599,212 +557,62 @@ export function AppSidebar({
                 </Tooltip>
               </TooltipProvider>
             </SidebarGroupLabel>
+
             <SidebarGroupContent>
               <SidebarMenu>
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <SidebarMenuItem key={i}>
                       <div className="px-2 py-2">
-                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-8 w-full" />
                       </div>
                     </SidebarMenuItem>
                   ))
-                ) : layersData && layersData.length > 0 ? (
-                  (() => {
-                    const grouped = layersData.reduce<Record<string, Layer[]>>((acc, layer) => {
-                      const cat = layer.category || "일반";
-                      if (!acc[cat]) acc[cat] = [];
-                      acc[cat].push(layer);
-                      return acc;
-                    }, {});
-                    const categories = Object.keys(grouped);
-
-                    return categories.map((cat, catIndex) => (
-                      <div key={cat}>
-                        {categories.length > 1 && catIndex > 0 && (
-                          <Separator className="my-1" />
-                        )}
-                        {categories.length > 1 && (
-                          <div className={`flex items-center gap-1.5 px-2.5 pb-1 ${catIndex === 0 ? "pt-1" : "pt-2"}`} data-testid={`category-label-${cat}`}>
-                            {(() => {
-                              const iconMap: Record<string, typeof Siren> = {
-                                "응급출동": Siren, "행정": Landmark, "교통": Car,
-                                "인프라": Building2, "환경": TreePine, "인구": Users,
-                                "물류": Package, "에너지": Zap,
-                                "공간데이터": Layers, "VWorld": Globe,
-                              };
-                              const fallbackIcons = [Hash, Globe, Map, Layers];
-                              const Icon = iconMap[cat] || fallbackIcons[cat.length % fallbackIcons.length];
-                              return <Icon className="w-3 h-3 text-primary" />;
-                            })()}
-                            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{cat}</span>
-                          </div>
-                        )}
-                        {grouped[cat].map((layer) => {
-                          const typeBadge = getLayerTypeBadge(layer);
-                          const sizeLabel = getLayerSizeLabel(layer);
-                          const isSelected = selectedLayerId === layer.id;
-
-                          return (
-                            <SidebarMenuItem key={layer.id}>
-                              <div
-                                className={`group flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors ${isSelected ? "bg-accent" : "hover-elevate"}`}
-                                onClick={() => { onLayerSelect?.(isSelected ? null : layer.id); closeMobileIfNeeded(); }}
-                                data-testid={`button-select-layer-${layer.id}`}
-                              >
-                                <Switch
-                                  checked={layer.visible}
-                                  onCheckedChange={(checked) => {
-                                    updateMutation.mutate({ id: layer.id, updates: { visible: checked } });
-                                    onLayerToggle?.(layer.id, checked);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="mt-0.5 h-4 w-7 data-[state=checked]:bg-primary [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3 flex-shrink-0"
-                                  data-testid={`switch-toggle-visibility-${layer.id}`}
-                                />
-                                <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                                  <div
-                                    className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                                    style={{ backgroundColor: layer.fillColor, border: `1px solid ${layer.strokeColor}` }}
-                                  />
-                                  <span
-                                    className={`text-xs font-medium truncate ${!layer.visible ? "text-muted-foreground" : ""}`}
-                                    data-testid={`text-layer-name-${layer.id}`}
-                                  >
-                                    {layer.name}
-                                  </span>
-                                  <div className="flex items-center gap-1 ml-auto flex-shrink-0">
-                                    <span className={`text-[9px] text-muted-foreground group-hover:hidden`} data-testid={`text-layer-size-${layer.id}`}>
-                                      {sizeLabel}
-                                    </span>
-                                    <div className="hidden group-hover:flex items-center gap-0.5">
-                                      <TooltipProvider delayDuration={200}>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-5 w-5 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                                              onClick={(e) => handleEditOpen(layer, e)}
-                                              data-testid={`button-edit-layer-${layer.id}`}
-                                            >
-                                              <Pencil className="w-3 h-3" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent side="bottom" className="text-xs">레이어 편집</TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                      <AlertDialog>
-                                        <TooltipProvider delayDuration={200}>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <AlertDialogTrigger asChild>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon"
-                                                  className="h-5 w-5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  data-testid={`button-delete-layer-inline-${layer.id}`}
-                                                >
-                                                  <Trash2 className="w-3 h-3" />
-                                                </Button>
-                                              </AlertDialogTrigger>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="bottom" className="text-xs">삭제</TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>레이어를 삭제하시겠습니까?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              <strong>"{layer.name}"</strong> 레이어와 모든 피처 데이터가 영구적으로 삭제됩니다.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>취소</AlertDialogCancel>
-                                            <AlertDialogAction
-                                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                deleteMutation.mutate(layer.id);
-                                              }}
-                                              data-testid={`button-confirm-delete-inline-${layer.id}`}
-                                            >
-                                              삭제
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </div>
-                                    {typeBadge !== "VECTOR" && (
-                                    <TooltipProvider delayDuration={300}>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span data-testid={`badge-layer-type-${layer.id}`} className="scale-[0.7] origin-right inline-flex group-hover:hidden">
-                                            {badgeStyle === "pill" && (
-                                              <span className={`inline-flex items-center justify-center h-4 px-1.5 rounded-full ${BADGE_COLOR_SOLID[typeBadge]} text-white text-[9px] font-bold shadow-sm`}>
-                                                {BADGE_SHORT[typeBadge]}
-                                              </span>
-                                            )}
-                                            {badgeStyle === "icon" && (
-                                              <span className={`inline-flex items-center gap-0.5 h-4 px-1 rounded-md text-[9px] font-semibold border ${BADGE_COLOR_LIGHT[typeBadge]}`}>
-                                                <Layers className="w-2.5 h-2.5" />{BADGE_SHORT[typeBadge]}
-                                              </span>
-                                            )}
-                                            {badgeStyle === "dot" && (
-                                              <span className={`inline-flex items-center gap-1 text-[9px] font-medium ${BADGE_COLOR_TEXT[typeBadge]}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${BADGE_COLOR_DOT[typeBadge]}`} />{BADGE_KO[typeBadge]}
-                                              </span>
-                                            )}
-                                            {badgeStyle === "underline" && (
-                                              <span className="inline-flex flex-col items-center">
-                                                <span className={`text-[9px] font-semibold ${BADGE_COLOR_TEXT[typeBadge]}`}>{BADGE_SHORT[typeBadge]}</span>
-                                                <span className={`w-3 h-[2px] rounded-full ${BADGE_COLOR_DOT[typeBadge]} mt-0.5`} />
-                                              </span>
-                                            )}
-                                            {badgeStyle === "gradient" && (
-                                              <span className={`inline-flex items-center justify-center h-4 px-1.5 rounded-md text-[9px] font-bold text-white shadow-sm bg-gradient-to-r ${BADGE_GRADIENT[typeBadge]}`}>
-                                                {BADGE_SHORT[typeBadge]}
-                                              </span>
-                                            )}
-                                          </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="bottom" className="text-xs">
-                                          {BADGE_TOOLTIP[typeBadge] || typeBadge}
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </SidebarMenuItem>
-                          );
-                        })}
-                      </div>
-                    ));
-                  })()
+                ) : categories.length > 0 ? (
+                  categories.map((cat, idx) => (
+                    <SidebarMenuItem key={cat}>
+                      {idx > 0 && <Separator className="my-1" />}
+                      <LayerGroup
+                        category={cat}
+                        layers={grouped[cat]}
+                        selectedLayerId={selectedLayerId}
+                        onToggle={handleToggle}
+                        onSelect={handleSelect}
+                        onEdit={handleEditOpen}
+                        onDelete={handleDelete}
+                      />
+                    </SidebarMenuItem>
+                  ))
                 ) : (
                   <SidebarMenuItem>
                     <div className="px-3 py-4 text-center">
                       <Map className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-                      <p className="text-xs text-muted-foreground" data-testid="text-no-layers">레이어가 없습니다</p>
-                      <p className="text-[10px] text-muted-foreground/60">+ 버튼으로 레이어를 추가하세요</p>
+                      <p className="text-xs text-muted-foreground" data-testid="text-no-layers">
+                        {searchQuery ? "검색 결과가 없습니다" : "레이어가 없습니다"}
+                      </p>
+                      {!searchQuery && (
+                        <p className="text-[10px] text-muted-foreground/60">+ 버튼으로 레이어를 추가하세요</p>
+                      )}
                     </div>
                   </SidebarMenuItem>
                 )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-
         </SidebarContent>
 
         <Separator />
-        <SidebarFooter className="p-2 space-y-1">
-          <UserFooter onSettingsOpen={onSettingsOpen} closeMobileIfNeeded={closeMobileIfNeeded} />
-        </SidebarFooter>
+
+        {/* Footer */}
+        <SidebarFooterWrapper className="p-2 space-y-1">
+          <SidebarFooterContent
+            onSettingsOpen={onSettingsOpen}
+            closeMobileIfNeeded={closeMobileIfNeeded}
+          />
+        </SidebarFooterWrapper>
       </Sidebar>
 
+      {/* Layer edit sheet (side panel) */}
       <LayerEditSheet
         layer={editingLayer}
         open={editSheetOpen}
