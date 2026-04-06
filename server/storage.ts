@@ -488,6 +488,40 @@ export class DatabaseStorage implements IStorage {
     const bounds = b && b.min_lng != null ? [b.min_lng, b.min_lat, b.max_lng, b.max_lat] : null;
     await db.update(layers).set({ featureCount: count, bounds }).where(eq(layers.id, layerId));
   }
+
+  async getMvtTile(layerId: string, z: number, x: number, y: number): Promise<Buffer | null> {
+    const result = await db.execute(sql`
+      WITH tile_env AS (
+        SELECT ST_TileEnvelope(${z}, ${x}, ${y}) AS envelope
+      ),
+      mvtgeom AS (
+        SELECT
+          ST_AsMVTGeom(
+            ST_Transform(f.geom, 3857),
+            tile_env.envelope,
+            4096,
+            64,
+            true
+          ) AS geom,
+          f.id,
+          f.properties
+        FROM features f, tile_env
+        WHERE f.layer_id = ${layerId}
+          AND f.geom IS NOT NULL
+          AND ST_Intersects(
+            f.geom,
+            ST_Transform(tile_env.envelope, 4326)
+          )
+        LIMIT 50000
+      )
+      SELECT ST_AsMVT(mvtgeom, 'default', 4096, 'geom') AS tile
+      FROM mvtgeom
+    `);
+
+    const row = result.rows[0] as any;
+    if (!row?.tile) return null;
+    return Buffer.from(row.tile);
+  }
 }
 
 export const storage = new DatabaseStorage();

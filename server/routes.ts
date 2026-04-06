@@ -250,6 +250,37 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ── MVT 벡터 타일 ──────────────────────────────────────────────────
+  app.get("/api/layers/:id/tiles/:z/:x/:y.pbf", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const z = parseInt(req.params.z, 10);
+      const x = parseInt(req.params.x, 10);
+      const y = parseInt(req.params.y, 10);
+
+      if (isNaN(z) || isNaN(x) || isNaN(y) || z < 0 || z > 22) {
+        return res.status(400).send("Invalid tile coordinates");
+      }
+
+      const layer = await storage.getLayer(id);
+      if (!layer) return res.status(404).send("Layer not found");
+
+      const tile = await storage.getMvtTile(id, z, x, y);
+
+      res.setHeader("Content-Type", "application/vnd.mapbox-vector-tile");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+
+      if (!tile || tile.length === 0) {
+        return res.status(204).send();
+      }
+
+      res.send(tile);
+    } catch (err) {
+      console.error("MVT tile error:", err);
+      res.status(500).send("Tile generation failed");
+    }
+  });
+
   // Feature API with BBOX filtering
   app.get("/api/layers/:id/features", requireAuth, async (req, res) => {
     const { bbox, limit, zoom } = req.query;

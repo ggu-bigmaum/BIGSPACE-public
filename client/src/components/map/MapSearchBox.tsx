@@ -73,9 +73,9 @@ export function MapSearchBox({ onMoveToLocation }: MapSearchBoxProps) {
     <div className="absolute top-3 z-10 left-3 w-[calc(100%-100px)] md:left-1/2 md:w-full md:max-w-md md:px-4 md:-translate-x-1/2">
       <form
         onSubmit={(e) => { e.preventDefault(); handleSearchGo(); }}
-        className="flex items-center gap-1 h-8 bg-black/60 backdrop-blur-md rounded-md border border-white/10 px-2"
+        className="flex items-center gap-1 h-8 bg-background/90 backdrop-blur-md border border-border rounded-lg shadow-md px-2"
       >
-        <Search className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
+        <Search className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
         <Input
           type="text"
           placeholder="주소, 지명 또는 좌표 검색..."
@@ -85,17 +85,17 @@ export function MapSearchBox({ onMoveToLocation }: MapSearchBoxProps) {
             if (!e.target.value.trim()) { setShowResults(false); setGeocodeResults([]); }
           }}
           onFocus={() => { if (geocodeResults.length > 0) setShowResults(true); }}
-          className="border-0 bg-transparent text-white placeholder:text-white/40 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 h-full py-0"
+          className="border-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 h-full py-0"
           data-testid="input-map-search"
         />
         {searchLoading ? (
           <div className="w-7 h-7 flex items-center justify-center flex-shrink-0">
-            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+            <div className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-muted-foreground/80 rounded-full animate-spin" />
           </div>
         ) : (
           <Button
             size="icon" variant="ghost" type="submit"
-            className="text-white/60 hover:text-white flex-shrink-0 w-7 h-7"
+            className="text-muted-foreground hover:text-foreground flex-shrink-0 w-7 h-7"
             data-testid="button-map-pin"
           >
             <MapPin className="w-3.5 h-3.5" />
@@ -104,24 +104,24 @@ export function MapSearchBox({ onMoveToLocation }: MapSearchBoxProps) {
       </form>
 
       {showResults && geocodeResults.length > 0 && (
-        <div className="mt-1 bg-black/80 backdrop-blur-md rounded-md border border-white/10 overflow-hidden" data-testid="search-results-dropdown">
+        <div className="mt-1 bg-background border border-border rounded-lg shadow-lg overflow-hidden" data-testid="search-results-dropdown">
           {geocodeResults.map((result, idx) => (
             <button
               key={idx}
-              className="w-full text-left px-3 py-2.5 text-sm text-white/90 hover:bg-white/10 transition-colors flex items-start gap-2 border-b border-white/5 last:border-0"
+              className="w-full text-left px-3 py-2.5 text-sm text-foreground hover:bg-accent transition-colors flex items-start gap-2 border-b border-border last:border-0"
               onClick={() => handleSelectResult(result)}
               data-testid={`search-result-${idx}`}
             >
               <MapPin className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
-              <span className="line-clamp-2 text-xs leading-relaxed">{result.display_name}</span>
+              <span className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{result.display_name}</span>
             </button>
           ))}
         </div>
       )}
 
       {showResults && !searchLoading && geocodeResults.length === 0 && searchQuery.trim() && (
-        <div className="mt-1 bg-black/80 backdrop-blur-md rounded-md border border-white/10 px-3 py-3" data-testid="search-no-results">
-          <p className="text-xs text-white/50 text-center">검색 결과가 없습니다</p>
+        <div className="mt-1 bg-background border border-border rounded-lg shadow-lg px-3 py-3" data-testid="search-no-results">
+          <p className="text-xs text-muted-foreground text-center">검색 결과가 없습니다</p>
         </div>
       )}
     </div>

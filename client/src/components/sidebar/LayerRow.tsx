@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { Eye, EyeOff, GripVertical, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button } from "@/components/ui/button";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +17,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { Layer } from "@shared/schema";
 
@@ -53,6 +51,7 @@ export function LayerRow({
   onDelete,
 }: LayerRowProps) {
   const [hovered, setHovered] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const {
     attributes,
@@ -90,20 +89,27 @@ export function LayerRow({
         style={{ backgroundColor: layer.strokeColor }}
       />
 
-      {/* Drag handle — visible on hover */}
-      <div
-        className={`flex items-center justify-center w-5 shrink-0 ${
-          hovered ? "opacity-100" : "opacity-0"
-        } transition-opacity`}
-        {...attributes}
-        {...listeners}
+      {/* Mini toggle — always visible, leftmost */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={layer.visible}
+        className={`relative ml-2 mr-1 shrink-0 h-3.5 w-6 rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+          layer.visible ? "bg-primary" : "bg-muted-foreground/25"
+        }`}
+        onClick={(e) => { e.stopPropagation(); onToggle(layer.id, !layer.visible); }}
+        data-testid={`switch-toggle-visibility-${layer.id}`}
       >
-        <GripVertical className="w-3 h-3 text-muted-foreground cursor-grab" />
-      </div>
+        <span
+          className={`absolute top-[2px] left-[2px] block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-150 ${
+            layer.visible ? "translate-x-2.5" : "translate-x-0"
+          }`}
+        />
+      </button>
 
       {/* Color dot */}
       <div
-        className="w-3 h-3 rounded-full shrink-0 border"
+        className="w-2.5 h-2.5 rounded-full shrink-0"
         style={{
           backgroundColor: layer.fillColor,
           borderColor: layer.strokeColor,
@@ -120,78 +126,51 @@ export function LayerRow({
         {layer.name}
       </span>
 
-      {/* Right side: size/type badge when not hovered, edit/delete when hovered */}
+      {/* Right side: size label or more menu */}
       <div className="flex items-center gap-0.5 shrink-0 mr-1">
         {hovered ? (
           <>
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                    onClick={(e) => onEdit(layer, e)}
-                    data-testid={`button-edit-layer-${layer.id}`}
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
+            {/* Drag handle */}
+            <div
+              className="flex items-center justify-center w-5 h-5 cursor-grab text-muted-foreground/50 hover:text-muted-foreground"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="w-3 h-3" />
+            </div>
+
+            {/* More menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex items-center justify-center w-5 h-5 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-32">
+                <DropdownMenuItem
+                  onClick={(e) => { e.stopPropagation(); onEdit(layer, e as any); }}
+                  data-testid={`button-edit-layer-${layer.id}`}
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-2" />
                   편집
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <AlertDialog>
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => e.stopPropagation()}
-                        data-testid={`button-delete-layer-inline-${layer.id}`}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </AlertDialogTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">
-                    삭제
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>레이어를 삭제하시겠습니까?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    <strong>"{layer.name}"</strong> 레이어와 모든 피처 데이터가
-                    영구적으로 삭제됩니다.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
-                    취소
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(layer.id);
-                    }}
-                    data-testid={`button-confirm-delete-inline-${layer.id}`}
-                  >
-                    삭제
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }}
+                  data-testid={`button-delete-layer-inline-${layer.id}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-2" />
+                  삭제
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         ) : (
           <span
-            className={`text-[9px] text-muted-foreground ${
+            className={`text-[9px] text-muted-foreground tabular-nums ${
               inactive ? "opacity-50" : ""
             }`}
             data-testid={`text-layer-size-${layer.id}`}
@@ -201,26 +180,33 @@ export function LayerRow({
         )}
       </div>
 
-      {/* Eye toggle — always visible */}
-      <button
-        type="button"
-        className={`flex items-center justify-center w-6 h-6 shrink-0 mr-1 rounded transition-colors ${
-          layer.visible
-            ? "text-foreground hover:text-muted-foreground"
-            : "text-muted-foreground/40 hover:text-muted-foreground"
-        }`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle(layer.id, !layer.visible);
-        }}
-        data-testid={`switch-toggle-visibility-${layer.id}`}
-      >
-        {layer.visible ? (
-          <Eye className="w-3.5 h-3.5" />
-        ) : (
-          <EyeOff className="w-3.5 h-3.5" />
-        )}
-      </button>
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>레이어를 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>"{layer.name}"</strong> 레이어와 모든 피처 데이터가
+              영구적으로 삭제됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(layer.id);
+              }}
+              data-testid={`button-confirm-delete-inline-${layer.id}`}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

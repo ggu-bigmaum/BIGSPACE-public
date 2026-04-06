@@ -23,7 +23,7 @@ function MapLayout() {
   const [radiusOpen, setRadiusOpen] = useState(false);
 
   const style = {
-    "--sidebar-width": "18rem",
+    "--sidebar-width": "19rem",
     "--sidebar-width-icon": "3rem",
   };
 

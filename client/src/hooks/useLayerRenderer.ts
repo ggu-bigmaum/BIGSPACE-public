@@ -1,6 +1,9 @@
 import { useEffect, useRef, useCallback } from "react";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
+import VectorTileLayer from "ol/layer/VectorTile";
+import VectorTileSource from "ol/source/VectorTile";
+import MVT from "ol/format/MVT";
 import TileLayer from "ol/layer/Tile";
 import TileWMS from "ol/source/TileWMS";
 import GeoJSON from "ol/format/GeoJSON";
@@ -22,6 +25,7 @@ export function useLayerRenderer(
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
   const wmsLayersRef = useRef<Map<string, TileLayer>>(new Map());
   const wfsLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
+  const mvtLayersRef = useRef<Map<string, VectorTileLayer>>(new Map());
   const layerRequestVersionRef = useRef<Map<string, number>>(new Map());
   const prevVisibleIdsRef = useRef<Set<string>>(new Set());
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,8 +43,14 @@ export function useLayerRenderer(
     return "feature";
   }, []);
 
+  const shouldUseMvt = useCallback((layer: Layer): boolean => {
+    if (layer.wmsUrl || layer.wfsUrl) return false;
+    const gtype = (layer.geometryType || "").toLowerCase();
+    return (gtype.includes("polygon") || gtype.includes("line")) && (layer.featureCount ?? 0) > 1000;
+  }, []);
+
   const fetchAndRenderLayer = useCallback(async (layer: Layer) => {
-    if (!mapInstance.current || layer.wmsUrl || layer.wfsUrl) return;
+    if (!mapInstance.current || layer.wmsUrl || layer.wfsUrl || shouldUseMvt(layer)) return;
 
     const map = mapInstance.current;
     const existing = vectorLayersRef.current.get(layer.id);
@@ -155,6 +165,34 @@ export function useLayerRenderer(
     wfsLayersRef.current.forEach((vl, id) => {
       if (!currentIds.has(id)) { mapInstance.current?.removeLayer(vl); wfsLayersRef.current.delete(id); }
     });
+    mvtLayersRef.current.forEach((vl, id) => {
+      if (!currentIds.has(id)) { mapInstance.current?.removeLayer(vl); mvtLayersRef.current.delete(id); }
+    });
+
+    // ── MVT 벡터 타일 레이어 ──
+    layerList.forEach(layer => {
+      if (!shouldUseMvt(layer)) return;
+      const existingMvt = mvtLayersRef.current.get(layer.id);
+      if (existingMvt) {
+        existingMvt.setVisible(layer.visible);
+        existingMvt.setOpacity(layer.opacity);
+      } else if (layer.visible) {
+        const mvtSource = new VectorTileSource({
+          format: new MVT(),
+          url: `/api/layers/${layer.id}/tiles/{z}/{x}/{y}.pbf`,
+          maxZoom: 18,
+        });
+        const style = getLayerStyle(layer);
+        const mvtLayer = new VectorTileLayer({
+          source: mvtSource,
+          style,
+          zIndex: 10,
+          opacity: layer.opacity,
+        });
+        mapInstance.current?.addLayer(mvtLayer);
+        mvtLayersRef.current.set(layer.id, mvtLayer);
+      }
+    });
 
     layerList.forEach(layer => {
       if (!layer.wfsUrl || !layer.wfsLayers) return;
@@ -178,7 +216,7 @@ export function useLayerRenderer(
               TYPENAME: wfsTypeName,
               BBOX: `${minLat},${minLon},${maxLat},${maxLon},EPSG:4326`,
               SRSNAME: "EPSG:4326",
-              OUTPUT: "application/json",
+              OUTPUTFORMAT: "application/json",
               MAXFEATURES: "500",
             });
             fetch(`/api/proxy/wfs?${params.toString()}`)
@@ -233,7 +271,7 @@ export function useLayerRenderer(
     });
 
     layerList.forEach(layer => {
-      if (layer.wmsUrl) return;
+      if (layer.wmsUrl || shouldUseMvt(layer)) return;
       const existing = vectorLayersRef.current.get(layer.id);
       if (!layer.visible && existing) {
         const v = (layerRequestVersionRef.current.get(layer.id) || 0) + 1;

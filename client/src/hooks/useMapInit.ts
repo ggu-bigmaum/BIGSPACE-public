@@ -138,9 +138,9 @@ export function useMapInit({
       map.forEachFeatureAtPixel(e.pixel, (feature) => {
         if (clicked) return;
         clicked = true;
-        const props = feature.getProperties();
+        const props = { ...feature.getProperties() };
         delete props.geometry;
-        const name = props.name || props._id || "Feature";
+        const name = props.name || props._id || props.id || "Feature";
         onSetPopupContent({ name, props });
         onPopupPosition(e.coordinate);
       });

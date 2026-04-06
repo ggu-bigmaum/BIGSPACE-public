@@ -1,4 +1,4 @@
-import { Sun, Moon, Monitor, Settings2, LogOut, User } from "lucide-react";
+import { Sun, Moon, Settings2, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -14,12 +14,11 @@ interface SidebarFooterContentProps {
   closeMobileIfNeeded: () => void;
 }
 
-const THEME_CYCLE = ["light", "dark", "system"] as const;
-const THEME_ICON = { light: Sun, dark: Moon, system: Monitor } as const;
+const THEME_ICON = { light: Sun, dark: Moon, system: Moon } as const;
 const THEME_LABEL = {
-  light: "라이트 모드",
-  dark: "다크 모드",
-  system: "시스템 설정",
+  light: "다크 모드로 전환",
+  dark: "라이트 모드로 전환",
+  system: "라이트 모드로 전환",
 } as const;
 
 export function SidebarFooterContent({
@@ -29,10 +28,8 @@ export function SidebarFooterContent({
   const { user, logoutMutation } = useAuth();
   const { theme, setTheme } = useTheme();
 
-  const cycleTheme = () => {
-    const idx = THEME_CYCLE.indexOf(theme);
-    const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
-    setTheme(next);
+  const toggleTheme = () => {
+    setTheme(theme === "light" ? "dark" : "light");
   };
 
   const ThemeIcon = THEME_ICON[theme];
@@ -56,7 +53,7 @@ export function SidebarFooterContent({
               variant="ghost"
               size="icon"
               className="h-7 w-7 shrink-0"
-              onClick={cycleTheme}
+              onClick={toggleTheme}
               data-testid="button-theme-toggle"
             >
               <ThemeIcon className="w-4 h-4" />
