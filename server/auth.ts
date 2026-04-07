@@ -20,7 +20,10 @@ export function setupAuth(app: Express) {
         tableName: "user_sessions",
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "bigspace-dev-secret-change-in-production",
+      secret: process.env.SESSION_SECRET || (() => {
+        if (process.env.NODE_ENV === "production") throw new Error("SESSION_SECRET is required in production");
+        return "bigspace-dev-secret-local-only";
+      })(),
       resave: false,
       saveUninitialized: false,
       cookie: {

@@ -8,7 +8,7 @@ import OSM from "ol/source/OSM";
 import { fromLonLat, toLonLat } from "ol/proj";
 import { Style, Fill, Stroke } from "ol/style";
 import Overlay from "ol/Overlay";
-import { defaults as defaultControls } from "ol/control";
+import { defaults as defaultControls, OverviewMap } from "ol/control";
 import { getHighlightStyle } from "@/lib/mapStyles";
 
 interface UseMapInitOptions {
@@ -56,6 +56,19 @@ export function useMapInit({
       }),
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
     });
+
+    // ── 오버뷰 맵 (미니맵) ──
+    const overviewMap = new OverviewMap({
+      collapsed: false,
+      collapsible: true,
+      layers: [new TileLayer({ source: new OSM() })],
+      view: new View({
+        projection: "EPSG:3857",
+        maxZoom: 8,
+        minZoom: 4,
+      }),
+    });
+    map.addControl(overviewMap);
 
     const highlightLayer = new VectorLayer({
       source: new VectorSource(),

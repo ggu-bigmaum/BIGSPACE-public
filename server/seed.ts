@@ -6,9 +6,9 @@ import { eq } from "drizzle-orm";
 async function upsertBasemaps() {
   console.log("Upserting basemaps...");
 
-  const kakaoKey = process.env.VITE_KAKAO_JS_KEY || "";
-  const ncpClientId = process.env.VITE_NCP_CLIENT_ID || "";
-  const vworldKey = process.env.VITE_VWORLD_KEY || "";
+  const kakaoKey = process.env.KAKAO_JS_KEY || process.env.VITE_KAKAO_JS_KEY || "";
+  const ncpClientId = process.env.NCP_CLIENT_ID || process.env.VITE_NCP_CLIENT_ID || "";
+  const vworldKey = process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "";
 
   const defaultBasemaps = [
     {
@@ -223,10 +223,46 @@ async function upsertEmergencyLayers() {
   }
 }
 
+async function upsertBoundaryLayers() {
+  const existingLayers = await storage.getLayers();
+  const existingNames = new Set(existingLayers.map(l => l.name));
+
+  const boundaryLayers = [
+    { name: "시도 경계", level: "시도", color: "#6366f1", width: 2.5, opacity: 0.6 },
+    { name: "시군구 경계", level: "시군구", color: "#8b5cf6", width: 1.5, opacity: 0.5 },
+    { name: "읍면동 경계", level: "읍면동", color: "#a78bfa", width: 1, opacity: 0.4 },
+  ];
+
+  for (const bl of boundaryLayers) {
+    if (existingNames.has(bl.name)) continue;
+    await storage.createLayer({
+      name: bl.name,
+      description: `internal://admin-boundaries?level=${bl.level}`,
+      category: "행정경계",
+      geometryType: "Polygon",
+      srid: 4326,
+      renderMode: "feature",
+      featureLimit: 5000,
+      minZoomForFeatures: 0,
+      minZoomForClusters: 0,
+      tileEnabled: false,
+      tileMaxZoom: 14,
+      visible: false,
+      opacity: bl.opacity,
+      strokeColor: bl.color,
+      fillColor: bl.color + "15",
+      strokeWidth: bl.width,
+      pointRadius: 4,
+    });
+    console.log(`Created boundary layer: ${bl.name}`);
+  }
+}
+
 export async function seedDatabase() {
   await upsertBasemaps();
   await upsertSettings();
   await upsertEmergencyLayers();
+  await upsertBoundaryLayers();
 
   const existingLayers = await storage.getLayers();
   const hasSampleLayers = existingLayers.some(l =>

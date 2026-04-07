@@ -11,17 +11,17 @@ export default function AuthPage() {
   const [isRegister, setIsRegister] = useState(false);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-accent/10">
+    <div className="min-h-screen flex items-center justify-center bg-white" style={{ background: "linear-gradient(to bottom right, #f8fafc, #f0fdfa)" }}>
       <div className="w-full max-w-[380px] mx-4">
         {/* Logo section */}
         <div className="text-center mb-6">
           <Heart className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <h1 className="text-xl font-bold text-foreground">BIGSPACE</h1>
-          <p className="text-sm text-muted-foreground mt-1">공간정보 통합 플랫폼</p>
+          <h1 className="text-xl font-bold text-slate-900">BIGSPACE</h1>
+          <p className="text-sm text-slate-500 mt-1">공간정보 통합 플랫폼</p>
         </div>
 
         {/* Card */}
-        <div className="bg-background border border-border rounded-xl shadow-lg p-6">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-6">
           {isRegister ? (
             <RegisterForm onSwitch={() => setIsRegister(false)} />
           ) : (
@@ -30,7 +30,7 @@ export default function AuthPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[11px] text-muted-foreground/60 mt-6">
+        <p className="text-center text-[11px] text-slate-400 mt-6">
           © 2026 BIGMAUM. All rights reserved.
         </p>
       </div>
@@ -96,8 +96,8 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
 
   return (
     <>
-      <h2 className="text-lg font-semibold text-foreground mb-1">로그인</h2>
-      <p className="text-sm text-muted-foreground mb-5">계정 정보를 입력해주세요.</p>
+      <h2 className="text-lg font-semibold text-slate-900 mb-1">로그인</h2>
+      <p className="text-sm text-slate-500 mb-5">계정 정보를 입력해주세요.</p>
 
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* 아이디 */}
@@ -106,7 +106,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
           placeholder="아이디"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+          className="w-full h-10 px-3 text-sm text-slate-900 bg-white border border-slate-200 rounded-md placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors"
           disabled={loginMutation.isPending}
           autoComplete="username"
         />
@@ -118,14 +118,14 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             placeholder="비밀번호"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-10 px-3 pr-10 text-sm bg-background border border-border rounded-md placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+            className="w-full h-10 px-3 pr-10 text-sm text-slate-900 bg-white border border-slate-200 rounded-md placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors"
             disabled={loginMutation.isPending}
             autoComplete="current-password"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
             tabIndex={-1}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -136,7 +136,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
         <button
           type="submit"
           disabled={loginMutation.isPending}
-          className="w-full h-10 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          className="w-full h-10 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50"
         >
           {loginMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin mx-auto" />
@@ -148,10 +148,10 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
 
       <div className="relative my-4">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
+          <div className="w-full border-t border-slate-200" />
         </div>
         <div className="relative flex justify-center text-xs">
-          <span className="bg-background px-2 text-muted-foreground">또는</span>
+          <span className="bg-white px-2 text-slate-400">또는</span>
         </div>
       </div>
 
@@ -160,7 +160,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
         type="button"
         onClick={handleGoogleLogin}
         disabled={googleLoading}
-        className="w-full h-10 bg-background border border-border rounded-md text-sm font-medium text-foreground hover:bg-accent transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+        className="w-full h-10 bg-white border border-slate-200 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
       >
         {googleLoading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -175,9 +175,9 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
         Google 계정으로 로그인
       </button>
 
-      <p className="text-center text-sm text-muted-foreground mt-5">
+      <p className="text-center text-sm text-slate-500 mt-5">
         계정이 없으신가요?{" "}
-        <button type="button" onClick={onSwitch} className="text-sm text-primary hover:underline">
+        <button type="button" onClick={onSwitch} className="text-sm text-teal-600 hover:underline">
           회원가입
         </button>
       </p>
@@ -225,8 +225,8 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
 
   return (
     <>
-      <h2 className="text-lg font-semibold text-foreground mb-1">회원가입</h2>
-      <p className="text-sm text-muted-foreground mb-5">새 계정을 만들어 시작하세요.</p>
+      <h2 className="text-lg font-semibold text-slate-900 mb-1">회원가입</h2>
+      <p className="text-sm text-slate-500 mb-5">새 계정을 만들어 시작하세요.</p>
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <input
@@ -234,7 +234,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
           placeholder="아이디"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+          className="w-full h-10 px-3 text-sm text-slate-900 bg-white border border-slate-200 rounded-md placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors"
           disabled={registerMutation.isPending}
           autoComplete="username"
         />
@@ -245,14 +245,14 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
             placeholder="비밀번호 (8자 이상)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-10 px-3 pr-10 text-sm bg-background border border-border rounded-md placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+            className="w-full h-10 px-3 pr-10 text-sm text-slate-900 bg-white border border-slate-200 rounded-md placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors"
             disabled={registerMutation.isPending}
             autoComplete="new-password"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
             tabIndex={-1}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -264,7 +264,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
           placeholder="비밀번호 확인"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+          className="w-full h-10 px-3 text-sm text-slate-900 bg-white border border-slate-200 rounded-md placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors"
           disabled={registerMutation.isPending}
           autoComplete="new-password"
         />
@@ -272,7 +272,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
         <button
           type="submit"
           disabled={registerMutation.isPending}
-          className="w-full h-10 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          className="w-full h-10 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50"
         >
           {registerMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin mx-auto" />
@@ -282,9 +282,9 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
         </button>
       </form>
 
-      <p className="text-center text-sm text-muted-foreground mt-5">
+      <p className="text-center text-sm text-slate-500 mt-5">
         이미 계정이 있으신가요?{" "}
-        <button type="button" onClick={onSwitch} className="text-sm text-primary hover:underline">
+        <button type="button" onClick={onSwitch} className="text-sm text-teal-600 hover:underline">
           로그인
         </button>
       </p>

@@ -12,12 +12,23 @@ import * as fs from "fs";
 import * as https from "https";
 import * as shapefile from "shapefile";
 import passport from "passport";
-import { hashPassword, requireAuth } from "./auth";
+import { hashPassword, requireAuth, requireAdmin } from "./auth";
 
 const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 1024 * 1024 * 1024 } }); // 1GB
 
 const NCP_CLIENT_ID = process.env.NCP_CLIENT_ID || "";
 const NCP_CLIENT_SECRET = process.env.NCP_CLIENT_SECRET || "";
+
+// ── 비동기 에러 래퍼 — try-catch 없는 라우트도 안전하게 처리 ──
+type AsyncHandler = (req: Request, res: Response) => Promise<any>;
+const asyncHandler = (fn: AsyncHandler) => (req: Request, res: Response, next: Function) => {
+  Promise.resolve(fn(req, res)).catch((err) => {
+    console.error(`[${req.method} ${req.path}] Unhandled error:`, err?.message || err);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+};
 
 // ── 감사 로그 헬퍼 (GS 인증 1-4) ───────────────────────────────────────
 function getClientIp(req: Request): string {
@@ -73,9 +84,9 @@ export async function registerRoutes(
       const user = await storage.createUser({ username, password: hashed });
 
       // 첫 번째 사용자는 자동으로 admin 승격
-      const countResult = await pool.query("SELECT COUNT(*)::int AS cnt FROM users");
-      if (countResult.rows[0].cnt <= 1) {
-        await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [user.id]);
+      const userCount = await storage.getUserCount();
+      if (userCount <= 1) {
+        await storage.promoteToAdmin(user.id);
         user.role = "admin";
       }
 
@@ -130,7 +141,7 @@ export async function registerRoutes(
 
       // Firebase REST API로 토큰 검증
       const firebaseRes = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.VITE_FIREBASE_API_KEY}`,
+        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -149,11 +160,10 @@ export async function registerRoutes(
       // 기존 유저 조회 또는 신규 생성
       let user = await storage.getUserByUsername(email);
       if (!user) {
-        const countResult = await pool.query("SELECT COUNT(*)::int AS cnt FROM users");
-        const isFirst = countResult.rows[0].cnt === 0;
-        user = await storage.createUser({ username: email, password: "" });
-        if (isFirst) {
-          await pool.query("UPDATE users SET role = 'admin' WHERE id = $1", [user.id]);
+        const userCount = await storage.getUserCount();
+        user = await storage.createUser({ username: email, password: "!oauth-no-local-login!" });
+        if (userCount === 0) {
+          await storage.promoteToAdmin(user.id);
           user.role = "admin";
         }
       }
@@ -179,29 +189,26 @@ export async function registerRoutes(
   });
 
   /** 감사 로그 조회 (admin only) */
-  app.get("/api/admin/audit-logs", requireAuth, async (req: Request, res: Response) => {
+  // TODO: requireAdmin으로 전환 예정 (현재 테스트 중이라 requireAuth 유지)
+  app.get("/api/admin/audit-logs", requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
     const offset = parseInt(req.query.offset as string) || 0;
-    const result = await pool.query(
-      "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2",
-      [limit, offset]
-    );
-    const countResult = await pool.query("SELECT COUNT(*)::int AS total FROM audit_logs");
-    res.json({ logs: result.rows, total: countResult.rows[0].total });
-  });
+    const data = await storage.getAuditLogs(limit, offset);
+    res.json(data);
+  }));
 
   // ══════════════════════════════════════════════════════════════════════
   // Layer CRUD (GS 인증 1-3: 권한별 접근 통제)
-  app.get("/api/layers", requireAuth, async (_req, res) => {
+  app.get("/api/layers", requireAuth, asyncHandler(async (_req, res) => {
     const layers = await storage.getLayers();
     res.json(layers);
-  });
+  }));
 
-  app.get("/api/layers/:id", requireAuth, async (req, res) => {
+  app.get("/api/layers/:id", requireAuth, asyncHandler(async (req, res) => {
     const layer = await storage.getLayer(req.params.id);
     if (!layer) return res.status(404).json({ message: "Layer not found" });
     res.json(layer);
-  });
+  }));
 
   app.post("/api/layers", requireAuth, async (req, res) => {
     try {
@@ -232,7 +239,7 @@ export async function registerRoutes(
     tileMaxZoom: z.number().int().min(0).max(22).optional(),
   }).strict();
 
-  app.patch("/api/layers/:id", requireAuth, async (req, res) => {
+  app.patch("/api/layers/:id", requireAuth, asyncHandler(async (req, res) => {
     const parsed = layerUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "잘못된 요청 데이터", errors: parsed.error.flatten() });
@@ -241,14 +248,14 @@ export async function registerRoutes(
     if (!layer) return res.status(404).json({ message: "Layer not found" });
     writeAuditLog(req, "UPDATE", "layer", layer.id, parsed.data);
     res.json(layer);
-  });
+  }));
 
-  app.delete("/api/layers/:id", requireAuth, async (req, res) => {
+  app.delete("/api/layers/:id", requireAuth, asyncHandler(async (req, res) => {
     const ok = await storage.deleteLayer(req.params.id);
     if (!ok) return res.status(404).json({ message: "Layer not found" });
     writeAuditLog(req, "DELETE", "layer", req.params.id);
     res.json({ success: true });
-  });
+  }));
 
   // ── MVT 벡터 타일 ──────────────────────────────────────────────────
   app.get("/api/layers/:id/tiles/:z/:x/:y.pbf", requireAuth, async (req, res) => {
@@ -364,9 +371,14 @@ export async function registerRoutes(
     const parsedBbox = (bbox as string).split(",").map(Number);
     if (parsedBbox.length !== 4) return res.status(400).json({ message: "Invalid bbox" });
 
-    const size = gridSize ? parseInt(gridSize as string, 10) : 20;
-    const grid = await storage.getGridAggregation(req.params.id, parsedBbox, size);
-    res.json(grid);
+    const size = Math.max(1, parseInt(gridSize as string, 10) || 10);
+    try {
+      const grid = await storage.getGridAggregation(req.params.id, parsedBbox, size);
+      res.json(grid);
+    } catch (err: any) {
+      console.error("[aggregate] error:", err?.message || err);
+      res.status(500).json({ message: "aggregate failed" });
+    }
   });
 
   app.get("/api/layers/:id/boundary-aggregate", requireAuth, async (req, res) => {
@@ -426,7 +438,7 @@ export async function registerRoutes(
   // VWorld WMS 프록시 (CORS 및 API 키 보호)
   app.get("/api/proxy/wms", (req, res) => {
     const params = new URLSearchParams(req.query as Record<string, string>);
-    params.set("KEY", process.env.VITE_VWORLD_KEY || "");
+    params.set("KEY", process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "");
     params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
     const path = `/req/wms?${params.toString()}`;
     const options: https.RequestOptions = {
@@ -438,7 +450,7 @@ export async function registerRoutes(
         "User-Agent": "Mozilla/5.0 (compatible; BIGSPACE/1.0)",
         "Accept": "image/png,image/*",
       },
-      rejectUnauthorized: false,
+      // rejectUnauthorized: true (default)
     };
     const proxyReq = https.request(options, (proxyRes) => {
       res.setHeader("Content-Type", proxyRes.headers["content-type"] || "image/png");
@@ -448,7 +460,7 @@ export async function registerRoutes(
     });
     proxyReq.on("error", (e) => {
       console.error("WMS 프록시 오류:", e.message);
-      res.status(500).send("WMS 프록시 오류: " + e.message);
+      res.status(500).send("WMS proxy error");
     });
     proxyReq.end();
   });
@@ -456,7 +468,7 @@ export async function registerRoutes(
   // VWorld WFS 프록시 (CORS 및 API 키 보호)
   app.get("/api/proxy/wfs", (req, res) => {
     const params = new URLSearchParams(req.query as Record<string, string>);
-    params.set("KEY", process.env.VITE_VWORLD_KEY || "");
+    params.set("KEY", process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "");
     params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
     const path = `/req/wfs?${params.toString()}`;
     const options: https.RequestOptions = {
@@ -468,7 +480,7 @@ export async function registerRoutes(
         "User-Agent": "Mozilla/5.0 (compatible; BIGSPACE/1.0)",
         "Accept": "application/json",
       },
-      rejectUnauthorized: false,
+      // rejectUnauthorized: true (default)
     };
     const proxyReq = https.request(options, (proxyRes) => {
       res.setHeader("Content-Type", proxyRes.headers["content-type"] || "application/json");
@@ -477,7 +489,7 @@ export async function registerRoutes(
     });
     proxyReq.on("error", (e) => {
       console.error("WFS 프록시 오류:", e.message);
-      res.status(500).send("WFS 프록시 오류: " + e.message);
+      res.status(500).send("WFS proxy error");
     });
     proxyReq.end();
   });
@@ -834,7 +846,10 @@ export async function registerRoutes(
   });
 
   // ── 일회성 데이터 마이그레이션 엔드포인트 ───────────────────────────────
-  const MIGRATE_TOKEN = "5ccade24-da86-45e8-bc19-59ddafaf3556";
+  const MIGRATE_TOKEN = process.env.MIGRATE_TOKEN || (() => {
+    if (process.env.NODE_ENV === "production") throw new Error("MIGRATE_TOKEN is required in production");
+    return "dev-migrate-token";
+  })();
 
   // 피처 배치 임포트 (id 제공 시 그대로 사용 → 멱등성 보장)
   app.post("/api/admin/import-features", requireAuth, async (req, res) => {
@@ -1031,6 +1046,14 @@ export async function registerRoutes(
     res.json({ results });
   });
   // ─────────────────────────────────────────────────────────────────────────
+
+  // ── 글로벌 에러 핸들러 — asyncHandler 미적용 라우트도 안전하게 처리 ──
+  app.use((err: any, _req: Request, res: Response, _next: Function) => {
+    console.error("[Global Error Handler]", err?.message || err);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   return httpServer;
 }

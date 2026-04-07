@@ -186,6 +186,124 @@
   }
 }
 
+/* ── OpenLayers OverviewMap (미니맵) ── */
+/* 축적 바(left-3 bottom-3) 높이 ~26px → bottom: 46px으로 그 위에 배치 */
+.ol-overviewmap {
+  position: absolute !important;
+  bottom: 46px !important;
+  left: 12px !important;
+  right: auto !important;
+  top: auto !important;
+  background: hsl(224 14% 13% / 0.85);
+  border: 1px solid hsl(220 10% 24%);
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.4);
+}
+
+.ol-overviewmap:not(.ol-collapsed) {
+  width: 260px !important;
+  height: 180px !important;
+}
+
+.ol-overviewmap.ol-collapsed {
+  width: 32px !important;
+  height: 32px !important;
+  background: hsl(224 14% 13% / 0.7);
+}
+
+/* OL이 인라인 style로 150x150 강제하므로 !important 필수 */
+.ol-overviewmap .ol-overviewmap-map {
+  width: 100% !important;
+  height: 100% !important;
+  border: none;
+  border-radius: 7px;
+}
+
+/* 뷰포트 사각형 (빨간 테두리) */
+.ol-overviewmap .ol-overviewmap-box {
+  border: 2px solid #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  border-radius: 2px;
+}
+
+/* 접기/펼치기 버튼 */
+.ol-overviewmap button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  background: hsl(220 10% 20% / 0.8);
+  color: hsl(210 12% 80%);
+  border: 1px solid hsl(220 10% 30%);
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  transition: background 150ms ease;
+}
+
+.ol-overviewmap button:hover {
+  background: hsl(220 10% 28%);
+}
+
+.ol-overviewmap.ol-collapsed button {
+  position: static;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+}
+
+/* ── 라이트모드 ── */
+:root .ol-overviewmap {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: hsl(220 13% 85%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+}
+
+:root .ol-overviewmap.ol-collapsed {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+:root .ol-overviewmap button {
+  background: hsl(220 14% 94%);
+  color: hsl(220 15% 30%);
+  border-color: hsl(220 13% 85%);
+}
+
+:root .ol-overviewmap button:hover {
+  background: hsl(220 14% 88%);
+}
+
+/* ── 다크모드 ── */
+.dark .ol-overviewmap {
+  background: hsl(224 14% 13% / 0.85);
+  border-color: hsl(220 10% 24%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.4);
+}
+
+.dark .ol-overviewmap.ol-collapsed {
+  background: hsl(224 14% 13% / 0.7);
+}
+
+.dark .ol-overviewmap button {
+  background: hsl(220 10% 20% / 0.8);
+  color: hsl(210 12% 80%);
+  border-color: hsl(220 10% 30%);
+}
+
+.dark .ol-overviewmap button:hover {
+  background: hsl(220 10% 28%);
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.

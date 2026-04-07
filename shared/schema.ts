@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, real, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, real, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -32,7 +32,9 @@ export const auditLogs = pgTable("audit_logs", {
   userAgent: text("user_agent"),
   details: jsonb("details"),                   // 추가 정보 (변경 전/후 등)
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_audit_logs_created_at").on(table.createdAt),
+]);
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 
@@ -89,7 +91,10 @@ export const features = pgTable("features", {
   minLat: real("min_lat"),
   maxLng: real("max_lng"),
   maxLat: real("max_lat"),
-});
+}, (table) => [
+  index("idx_features_layer_id").on(table.layerId),
+  index("idx_features_layer_lng_lat").on(table.layerId, table.lng, table.lat),
+]);
 
 export const featuresRelations = relations(features, ({ one }) => ({
   layer: one(layers, {
@@ -153,7 +158,10 @@ export const administrativeBoundaries = pgTable("administrative_boundaries", {
   maxLat: real("max_lat"),
   centerLng: real("center_lng"),
   centerLat: real("center_lat"),
-});
+}, (table) => [
+  index("idx_admin_boundaries_level").on(table.level),
+  index("idx_admin_boundaries_code").on(table.code),
+]);
 
 export const insertAdminBoundarySchema = createInsertSchema(administrativeBoundaries).omit({
   id: true,
@@ -173,7 +181,9 @@ export const boundaryAggregateCache = pgTable("boundary_aggregate_cache", {
   centerLng: real("center_lng").notNull(),
   centerLat: real("center_lat").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_boundary_cache_layer_level").on(table.layerId, table.level),
+]);
 
 export type BoundaryAggregateCache = typeof boundaryAggregateCache.$inferSelect;
 

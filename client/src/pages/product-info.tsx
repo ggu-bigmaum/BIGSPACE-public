@@ -85,11 +85,11 @@ export default function ProductInfoPage() {
             BIGSPACE Public
           </h1>
           <p className="text-sm text-muted-foreground mb-3" data-testid="text-product-subtitle">
-            고성능 공간정보 관리 플랫폼 · v1.3
+            고성능 공간정보 관리 플랫폼 · v0.8
           </p>
           <div className="flex items-center justify-center gap-2">
             <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">
-              v1.3
+              v0.8
             </Badge>
             <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
               조달청 등록 대상

@@ -32,14 +32,15 @@ export function useLayerRenderer(
 
   const getZoomTier = useCallback((layer: Layer, zoom: number): "sido" | "sigungu" | "eupmyeondong" | "cluster" | "feature" => {
     if (layer.renderMode === "feature") return "feature";
+    const z = Math.round(zoom);
     if (layer.geometryType === "Point" && layer.featureCount > 100) {
-      if (zoom <= 11) return "sido";
-      if (zoom <= 13) return "sigungu";
-      if (zoom <= 16) return "eupmyeondong";
-      if (zoom <= 17) return "cluster";
+      if (z <= 11) return "sido";
+      if (z <= 13) return "sigungu";
+      if (z <= 15) return "eupmyeondong";
+      if (z <= 17) return "cluster";
       return "feature";
     }
-    if (layer.featureCount > 100 && zoom < layer.minZoomForFeatures) return "cluster";
+    if (layer.featureCount > 100 && z < layer.minZoomForFeatures) return "cluster";
     return "feature";
   }, []);
 
@@ -47,6 +48,12 @@ export function useLayerRenderer(
     if (layer.wmsUrl || layer.wfsUrl) return false;
     const gtype = (layer.geometryType || "").toLowerCase();
     return (gtype.includes("polygon") || gtype.includes("line")) && (layer.featureCount ?? 0) > 1000;
+  }, []);
+
+  const isAdminBoundaryLayer = useCallback((layer: Layer): string | null => {
+    const desc = layer.description || "";
+    const match = desc.match(/^internal:\/\/admin-boundaries\?level=(.+)$/);
+    return match ? match[1] : null;
   }, []);
 
   const fetchAndRenderLayer = useCallback(async (layer: Layer) => {
@@ -62,6 +69,34 @@ export function useLayerRenderer(
       return;
     }
 
+    // ── 행정경계 레이어 (internal://admin-boundaries) ──
+    const boundaryLevel = isAdminBoundaryLayer(layer);
+    if (boundaryLevel) {
+      try {
+        const res = await fetch(`/api/admin-boundaries/geojson?level=${encodeURIComponent(boundaryLevel)}`);
+        if (layerRequestVersionRef.current.get(layer.id) !== version) return;
+        const geojson = await res.json();
+        const source = new VectorSource({
+          features: geojsonFormat.readFeatures(geojson, { featureProjection: "EPSG:3857" }),
+        });
+        const style = getLayerStyle(layer);
+        if (existing) {
+          existing.setSource(source);
+          existing.setStyle(style);
+          existing.setVisible(true);
+          existing.setOpacity(layer.opacity);
+        } else {
+          const vl = new VectorLayer({ source, style, zIndex: 5, opacity: layer.opacity });
+          vl.setVisible(true);
+          map.addLayer(vl);
+          vectorLayersRef.current.set(layer.id, vl);
+        }
+      } catch (err) {
+        console.error("Failed to load boundary layer:", boundaryLevel, err);
+      }
+      return;
+    }
+
     const view = map.getView();
     const size = map.getSize();
     if (!size || size[0] === 0 || size[1] === 0) return;
@@ -72,10 +107,20 @@ export function useLayerRenderer(
     const zoom = view.getZoom() || 11;
     const tier = getZoomTier(layer, zoom);
 
-    const setLayer = (source: VectorSource) => {
+    // 새 fetch 시작 전 기존 데이터 즉시 제거 — tier 전환 시 겹침 방지
+    if (existing) existing.getSource()?.clear();
+
+    // 격자 칸 크기를 ≈300m(≈0.0027°)로 고정, 뷰포트 폭에 맞춰 격자 수 계산
+    const bboxWidthDeg = tr[0] - bl[0];
+    const targetCellDeg = 0.0027;
+    const dynamicGridSize = Math.max(3, Math.min(20, Math.round(bboxWidthDeg / targetCellDeg)));
+
+    // clearStyle=true: feature-level 스타일 사용 시 레이어 style 초기화 필요
+    const setLayer = (source: VectorSource, clearStyle = false) => {
       if (layerRequestVersionRef.current.get(layer.id) !== version) return;
       if (existing) {
         existing.setSource(source);
+        if (clearStyle) existing.setStyle(undefined as any);
         existing.setVisible(true);
         existing.setOpacity(layer.opacity);
       } else {
@@ -104,10 +149,10 @@ export function useLayerRenderer(
           f.setStyle(getBoundaryCircleStyle(b.count, maxCount, b.name, layer, level));
           source.addFeature(f);
         });
-        setLayer(source);
+        setLayer(source, true); // feature-level 스타일 → 레이어 style 초기화
 
       } else if (tier === "cluster") {
-        const res = await fetch(`/api/layers/${layer.id}/aggregate?bbox=${bbox}&gridSize=8`);
+        const res = await fetch(`/api/layers/${layer.id}/aggregate?bbox=${bbox}&gridSize=${dynamicGridSize}`);
         if (layerRequestVersionRef.current.get(layer.id) !== version) return;
         const data = await res.json();
 
@@ -120,7 +165,7 @@ export function useLayerRenderer(
           f.setStyle(getClusterStyle(cell.count));
           source.addFeature(f);
         });
-        setLayer(source);
+        setLayer(source, true); // feature-level 스타일 → 레이어 style 초기화
 
       } else {
         const res = await fetch(`/api/layers/${layer.id}/features?bbox=${bbox}&limit=${layer.featureLimit}&zoom=${Math.round(zoom)}`);
@@ -135,7 +180,7 @@ export function useLayerRenderer(
         const style = getLayerStyle(layer);
         if (existing) {
           existing.setSource(source);
-          existing.setStyle(style);
+          existing.setStyle(style); // 레이어 level 스타일 복원
           existing.setVisible(true);
           existing.setOpacity(layer.opacity);
         } else {
@@ -202,11 +247,9 @@ export function useLayerRenderer(
         existingWfs.setOpacity(layer.opacity);
       } else {
         const wfsTypeName = layer.wfsLayers;
-        console.log(`[WFS] Creating layer: ${layer.name}, typeName: ${wfsTypeName}`);
         const wfsSource = new VectorSource({
           format: new GeoJSON(),
           loader: (extent, _resolution, projection, success, failure) => {
-            console.log(`[WFS] Loader called for ${layer.name}, extent:`, extent);
             const [minLon, minLat, maxLon, maxLat] = transformExtent(extent, projection, "EPSG:4326");
             // WFS 1.1.0 + EPSG:4326: 축 순서가 lat,lon (VWorld 표준)
             const params = new URLSearchParams({
@@ -232,7 +275,6 @@ export function useLayerRenderer(
                   dataProjection: "EPSG:4326",
                   featureProjection: "EPSG:3857",
                 });
-                console.log(`[WFS] ${layer.name}: ${features.length} features loaded`);
                 wfsSource.addFeatures(features);
                 success?.(features);
               })
@@ -244,7 +286,9 @@ export function useLayerRenderer(
           strategy: bboxStrategy,
         });
         const style = getLayerStyle(layer);
-        const vl = new VectorLayer({ source: wfsSource, style, zIndex: 8, opacity: layer.opacity, minZoom: layer.minZoomForFeatures ?? 11 });
+        // minZoom - 0.5: OL은 소수점 줌을 사용하므로, 정수 줌 전환 직전에도 보이도록 여유
+        const wfsMinZoom = (layer.minZoomForFeatures ?? 11) - 0.5;
+        const vl = new VectorLayer({ source: wfsSource, style, zIndex: 8, opacity: layer.opacity, minZoom: wfsMinZoom });
         vl.setVisible(layer.visible);
         mapInstance.current?.addLayer(vl);
         wfsLayersRef.current.set(layer.id, vl);
@@ -263,7 +307,9 @@ export function useLayerRenderer(
           params: { LAYERS: layer.wmsLayers, FORMAT: "image/png", TRANSPARENT: "TRUE", VERSION: "1.3.0", CRS: "EPSG:4326" },
           crossOrigin: "anonymous",
         });
-        const tl = new TileLayer({ source: wmsSource, zIndex: 9, opacity: layer.opacity, minZoom: layer.minZoomForFeatures ?? 11 });
+        // minZoom - 0.5: OL은 소수점 줌을 사용하므로, 정수 줌 전환 직전에도 보이도록 여유
+        const wmsMinZoom = (layer.minZoomForFeatures ?? 11) - 0.5;
+        const tl = new TileLayer({ source: wmsSource, zIndex: 9, opacity: layer.opacity, minZoom: wmsMinZoom });
         tl.setVisible(layer.visible);
         mapInstance.current?.addLayer(tl);
         wmsLayersRef.current.set(layer.id, tl);

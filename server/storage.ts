@@ -15,6 +15,10 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getUserCount(): Promise<number>;
+  promoteToAdmin(userId: string): Promise<void>;
+  getAuditLogs(limit: number, offset: number): Promise<{ logs: any[]; total: number }>;
+  getGridAggregation(layerId: string, bbox: number[], gridSize: number): Promise<{ lng: number; lat: number; count: number }[]>;
 
   getLayers(): Promise<Layer[]>;
   getLayer(id: string): Promise<Layer | undefined>;
@@ -33,7 +37,6 @@ export interface IStorage {
 
   getFeaturesInRadius(lng: number, lat: number, radiusKm: number, layerIds?: string[]): Promise<Feature[]>;
   getFeaturesInBbox(layerId: string, bbox: number[], limit: number): Promise<{ count: number; features: { id: string; lng: number; lat: number; properties: any }[] }>;
-  getGridAggregation(layerId: string, bbox: number[], gridSize: number): Promise<{ lng: number; lat: number; count: number }[]>;
 
   createSpatialQuery(query: InsertSpatialQuery): Promise<SpatialQuery>;
   getSpatialQueries(): Promise<SpatialQuery[]>;
@@ -71,6 +74,52 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async getUserCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(users);
+    return result[0]?.count ?? 0;
+  }
+
+  async promoteToAdmin(userId: string): Promise<void> {
+    await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
+  }
+
+  async getAuditLogs(limit: number, offset: number): Promise<{ logs: any[]; total: number }> {
+    const logs = await db.execute(sql`SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`);
+    const countResult = await db.execute(sql`SELECT COUNT(*)::int AS total FROM audit_logs`);
+    return { logs: logs.rows, total: (countResult.rows[0] as any)?.total ?? 0 };
+  }
+
+  async getGridAggregation(layerId: string, bbox: number[], gridSize: number): Promise<{ lng: number; lat: number; count: number }[]> {
+    const [minLng, minLat, maxLng, maxLat] = bbox;
+    const size = Math.max(1, gridSize || 10);
+    const lngStep = (maxLng - minLng) / size;
+    const latStep = (maxLat - minLat) / size;
+    if (!lngStep || !latStep) return [];
+
+    const result = await db.execute(sql`
+      SELECT AVG(lng)::float8 AS lng, AVG(lat)::float8 AS lat, count(*)::int AS count
+      FROM (
+        SELECT lng, lat,
+          floor((lng - ${minLng}) / ${lngStep})::int AS gx,
+          floor((lat - ${minLat}) / ${latStep})::int AS gy
+        FROM features
+        WHERE layer_id = ${layerId}
+          AND lng IS NOT NULL AND lat IS NOT NULL
+          AND lng BETWEEN ${minLng} AND ${maxLng}
+          AND lat BETWEEN ${minLat} AND ${maxLat}
+      ) t
+      GROUP BY gx, gy
+      HAVING count(*) > 0
+      ORDER BY count DESC
+      LIMIT 500
+    `);
+    return result.rows.map((r: any) => ({
+      lng: parseFloat(r.lng),
+      lat: parseFloat(r.lat),
+      count: parseInt(r.count),
+    }));
   }
 
   async getLayers(): Promise<Layer[]> {
@@ -166,9 +215,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteFeaturesByLayer(layerId: string): Promise<number> {
-    const result = await db.delete(features).where(eq(features.layerId, layerId)).returning();
+    const result = await db.delete(features).where(eq(features.layerId, layerId));
     await this.refreshLayerStats(layerId);
-    return result.length;
+    return result.rowCount ?? 0;
   }
 
   async getFeatureCount(layerId: string): Promise<number> {
@@ -228,34 +277,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getGridAggregation(layerId: string, bbox: number[], gridSize: number): Promise<{ lng: number; lat: number; count: number }[]> {
-    const [minLng, minLat, maxLng, maxLat] = bbox;
-    const lngStep = (maxLng - minLng) / gridSize;
-    const latStep = (maxLat - minLat) / gridSize;
-
-    const result = await db.execute(sql`
-      SELECT
-        (${minLng}::float8 + (floor((ST_X(geom::geometry) - ${minLng}::float8) / ${lngStep}::float8) + 0.5) * ${lngStep}::float8)::float8 AS lng,
-        (${minLat}::float8 + (floor((ST_Y(geom::geometry) - ${minLat}::float8) / ${latStep}::float8) + 0.5) * ${latStep}::float8)::float8 AS lat,
-        count(*)::int AS count
-      FROM features
-      WHERE layer_id = ${layerId}
-        AND geom IS NOT NULL
-        AND ST_Intersects(geom, ST_MakeEnvelope(${minLng}::float8, ${minLat}::float8, ${maxLng}::float8, ${maxLat}::float8, 4326))
-      GROUP BY
-        floor((ST_X(geom::geometry) - ${minLng}::float8) / ${lngStep}::float8),
-        floor((ST_Y(geom::geometry) - ${minLat}::float8) / ${latStep}::float8)
-      HAVING count(*) > 0
-      ORDER BY count DESC
-      LIMIT 500
-    `);
-
-    return (result.rows as any[]).map(r => ({
-      lng: parseFloat(r.lng),
-      lat: parseFloat(r.lat),
-      count: parseInt(r.count),
-    }));
-  }
 
   async createSpatialQuery(query: InsertSpatialQuery): Promise<SpatialQuery> {
     const [created] = await db.insert(spatialQueries).values(query).returning();
