@@ -10,18 +10,10 @@ export function serveStatic(app: Express) {
     );
   }
 
-  // JS/CSS는 파일명에 해시가 있어서 캐시해도 안전, index.html은 캐시 금지
-  app.use(express.static(distPath, {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith("index.html")) {
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      }
-    },
-  }));
+  app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
   app.use("/{*path}", (_req, res) => {
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

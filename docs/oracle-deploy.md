@@ -147,8 +147,8 @@ cd ~/BIGSPACE-public
 git checkout -- package-lock.json
 git pull
 npm install
-npm run build          # ⚠️ 절대 빠뜨리지 말 것
-pm2 restart bigspace   # reload 아닌 restart 사용
+npm run build
+pm2 restart bigspace
 ```
 
 ---
