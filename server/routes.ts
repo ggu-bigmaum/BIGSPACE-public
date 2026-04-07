@@ -331,6 +331,13 @@ export async function registerRoutes(
           properties: f.properties || {},
         }));
         const created = await storage.createFeatures(featureList);
+
+        // 배치 추가 후 격자 캐시 자동 리빌드 (백그라운드)
+        const CELL_SIZE = 0.0027;
+        storage.buildGridCache(req.params.id, CELL_SIZE)
+          .then(cnt => console.log(`[auto] Grid cache rebuilt for layer ${req.params.id}: ${cnt} cells`))
+          .catch(err => console.error(`[auto] Grid cache rebuild failed:`, err?.message || err));
+
         res.status(201).json({ created: created.length });
       } else {
         const feature = await storage.createFeature({
@@ -347,6 +354,13 @@ export async function registerRoutes(
 
   app.delete("/api/layers/:id/features", requireAuth, async (req, res) => {
     const count = await storage.deleteFeaturesByLayer(req.params.id);
+
+    // 피처 삭제 시 격자 캐시도 제거 (백그라운드)
+    const CELL_SIZE = 0.0027;
+    storage.buildGridCache(req.params.id, CELL_SIZE)
+      .then(cnt => console.log(`[auto] Grid cache rebuilt after delete for layer ${req.params.id}: ${cnt} cells`))
+      .catch(err => console.error(`[auto] Grid cache rebuild failed:`, err?.message || err));
+
     res.json({ deleted: count });
   });
 
@@ -929,6 +943,13 @@ export async function registerRoutes(
           inserted += chunk.length;
         }
         await client.query("COMMIT");
+
+        // 임포트 완료 후 격자 캐시 자동 빌드 (백그라운드, 응답 차단 안함)
+        const CELL_SIZE = 0.0027;
+        storage.buildGridCache(layerId, CELL_SIZE)
+          .then(cnt => console.log(`[auto] Grid cache built for layer ${layerId}: ${cnt} cells`))
+          .catch(err => console.error(`[auto] Grid cache build failed for ${layerId}:`, err?.message || err));
+
         res.json({ inserted });
       } catch (e) {
         await client.query("ROLLBACK");
