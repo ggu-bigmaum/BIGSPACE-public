@@ -237,7 +237,18 @@ export async function registerRoutes(
     minZoomForClusters: z.number().int().min(0).max(22).optional(),
     tileEnabled: z.boolean().optional(),
     tileMaxZoom: z.number().int().min(0).max(22).optional(),
+    sortOrder: z.number().int().min(0).optional(),
   }).strict();
+
+  // 드래그 순서 일괄 저장
+  app.patch("/api/layers/reorder", requireAuth, asyncHandler(async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.some(id => typeof id !== "string")) {
+      return res.status(400).json({ message: "ids must be a string array" });
+    }
+    await Promise.all(ids.map((id: string, idx: number) => storage.updateLayer(id, { sortOrder: idx })));
+    res.json({ success: true });
+  }));
 
   app.patch("/api/layers/:id", requireAuth, asyncHandler(async (req, res) => {
     const parsed = layerUpdateSchema.safeParse(req.body);

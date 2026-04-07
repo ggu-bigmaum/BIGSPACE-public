@@ -11,7 +11,10 @@ export default function AuthPage() {
   const [isRegister, setIsRegister] = useState(false);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white" style={{ background: "linear-gradient(to bottom right, #f8fafc, #f0fdfa)" }}>
+    <div className="min-h-screen flex items-center justify-center" style={{
+      backgroundColor: "#f0fdfa",
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cpath d='M0 100 Q30 85 60 100 Q90 115 120 100 Q150 85 200 95' stroke='%230D9488' stroke-width='1' fill='none' opacity='0.12'/%3E%3Cpath d='M0 130 Q40 115 70 132 Q100 148 130 132 Q160 118 200 125' stroke='%230D9488' stroke-width='1' fill='none' opacity='0.1'/%3E%3Cpath d='M0 70 Q35 55 65 72 Q95 88 125 70 Q155 53 200 65' stroke='%230D9488' stroke-width='1' fill='none' opacity='0.1'/%3E%3Cpath d='M0 160 Q45 148 80 163 Q110 177 145 160 Q170 145 200 155' stroke='%230D9488' stroke-width='1' fill='none' opacity='0.08'/%3E%3Cpath d='M0 40 Q38 28 72 42 Q105 56 135 40 Q165 25 200 35' stroke='%230D9488' stroke-width='1' fill='none' opacity='0.08'/%3E%3C/svg%3E")`,
+    }}>
       <div className="w-full max-w-[380px] mx-4">
         {/* Logo section */}
         <div className="text-center mb-6">

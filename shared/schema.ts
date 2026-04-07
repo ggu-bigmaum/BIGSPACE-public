@@ -57,6 +57,7 @@ export const layers = pgTable("layers", {
   fillColor: text("fill_color").notNull().default("#0d948850"),
   strokeWidth: real("stroke_width").notNull().default(2),
   pointRadius: real("point_radius").notNull().default(6),
+  sortOrder: integer("sort_order").notNull().default(0),
   featureCount: integer("feature_count").notNull().default(0),
   bounds: jsonb("bounds"),
   wmsUrl: text("wms_url"),

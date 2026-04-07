@@ -587,11 +587,23 @@ export function AppSidebar({
                   <SidebarMenuItem>
                     <div className="px-3 py-4 text-center">
                       <Map className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-                      <p className="text-xs text-muted-foreground" data-testid="text-no-layers">
-                        {searchQuery ? "검색 결과가 없습니다" : "레이어가 없습니다"}
-                      </p>
-                      {!searchQuery && (
-                        <p className="text-[10px] text-muted-foreground/60">+ 버튼으로 레이어를 추가하세요</p>
+                      {searchQuery ? (
+                        <>
+                          <p className="text-xs text-muted-foreground" data-testid="text-no-layers">
+                            &ldquo;{searchQuery}&rdquo;에 맞는 레이어가 없습니다
+                          </p>
+                          <button
+                            className="mt-2 text-[11px] text-primary hover:underline"
+                            onClick={() => setSearchQuery("")}
+                          >
+                            × 검색 초기화
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs text-muted-foreground" data-testid="text-no-layers">레이어가 없습니다</p>
+                          <p className="text-[10px] text-muted-foreground/60">+ 버튼으로 레이어를 추가하세요</p>
+                        </>
                       )}
                     </div>
                   </SidebarMenuItem>

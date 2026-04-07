@@ -297,6 +297,53 @@ git commit -m "design: enhance theme provider — system preference detection, t
 
 ---
 
+## Task 2.5: Schema — Layer Sort Order
+
+**디자인 리뷰에서 추가됨:** 드래그 정렬 순서를 서버에 저장하려면 `layers` 테이블에 `sort_order` 컬럼이 필요.
+
+**Files:**
+- Modify: `shared/schema.ts`
+- Modify: `server/storage.ts`
+- Modify: `server/routes.ts`
+
+- [ ] **Step 1: `shared/schema.ts`에 sortOrder 컬럼 추가**
+
+`layers` 테이블 정의에 추가:
+```ts
+sortOrder: integer("sort_order").notNull().default(0),
+```
+
+- [ ] **Step 2: `server/storage.ts` — getLayers 정렬 기준 변경**
+
+기존 `orderBy(asc(layers.createdAt))` → `orderBy(asc(layers.sortOrder), asc(layers.createdAt))`
+
+- [ ] **Step 3: `server/routes.ts` — reorder 엔드포인트 추가**
+
+```ts
+// PATCH /api/layers/reorder — 드래그 순서 저장
+app.patch("/api/layers/reorder", requireAuth, asyncHandler(async (req, res) => {
+  const { ids } = req.body; // string[] — 순서대로 정렬된 레이어 id 배열
+  if (!Array.isArray(ids)) return res.status(400).json({ message: "ids must be an array" });
+  await Promise.all(ids.map((id, idx) => storage.updateLayer(id, { sortOrder: idx })));
+  res.json({ success: true });
+}));
+```
+
+- [ ] **Step 4: DB 스키마 적용**
+
+```bash
+npm run db:push
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add shared/schema.ts server/storage.ts server/routes.ts
+git commit -m "feat: add sort_order to layers — persist drag sort order"
+```
+
+---
+
 ## Task 3: Install New Dependencies
 
 **Files:**
@@ -1145,6 +1192,7 @@ git commit -m "design: final polish — collapse mode, theme transition, cleanup
 |------|-------------|---------|
 | 1 | Design tokens + fonts | 1 |
 | 2 | Theme provider enhancement | 1 |
+| 2.5 | Schema — Layer sort_order 추가 | 1 |
 | 3 | Install dependencies | 1 |
 | 4 | Extract sidebar sub-components | 1 |
 | 5 | Rewrite app-sidebar composition | 1 |
@@ -1153,4 +1201,30 @@ git commit -m "design: final polish — collapse mode, theme transition, cleanup
 | 8 | Login page redesign | 1 |
 | 9 | Loading & feedback states | 1 |
 | 10 | Final polish | 1 |
-| **Total** | | **10 commits** |
+| **Total** | | **11 commits** |
+
+---
+
+## DESIGN REVIEW DECISIONS (2026-04-07)
+
+디자인 리뷰에서 확정된 항목:
+
+| 항목 | 결정 |
+|------|------|
+| 검색 빈 상태 | 따뜻한 메시지 + [× 초기화] 버튼 |
+| 로그인 배경 | SVG 지형도 등고선 패턴 (opacity 0.06, 200×200px 타일) |
+| 드래그 순서 저장 | schema sort_order 컬럼 + PATCH /api/layers/reorder API |
+| 접힌 사이드바(48px) | 색상 도트만 (가시성 ON/OFF 투명도 표현) |
+
+디자인 스펙 파일(`docs/superpowers/specs/2026-04-06-ui-redesign-design.md`) 업데이트 완료.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | PLAN | 5 issues, 1 critical |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | issues_open | score: 6/10 → 8/10, 4 decisions |
+
+**VERDICT:** ENG REVIEW PASSED (PLAN stage) — Design review complete with 4 decisions resolved. eng review recommended after implementation.

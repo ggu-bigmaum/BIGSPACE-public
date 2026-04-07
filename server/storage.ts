@@ -92,7 +92,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLayers(): Promise<Layer[]> {
-    return db.select().from(layers).orderBy(asc(layers.createdAt));
+    return db.select().from(layers).orderBy(asc(layers.sortOrder), asc(layers.createdAt));
   }
 
   async getLayer(id: string): Promise<Layer | undefined> {
