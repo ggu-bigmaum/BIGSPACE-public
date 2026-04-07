@@ -6,7 +6,7 @@ import {
   type Basemap, type InsertBasemap,
   type AppSetting, type InsertAppSetting,
   type AdminBoundary, type InsertAdminBoundary,
-  users, layers, features, spatialQueries, basemaps, appSettings, administrativeBoundaries, boundaryAggregateCache, gridAggregateCache,
+  users, layers, features, spatialQueries, basemaps, appSettings, administrativeBoundaries, boundaryAggregateCache,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
@@ -18,8 +18,6 @@ export interface IStorage {
   getUserCount(): Promise<number>;
   promoteToAdmin(userId: string): Promise<void>;
   getAuditLogs(limit: number, offset: number): Promise<{ logs: any[]; total: number }>;
-  getGridAggregation(layerId: string, bbox: number[], gridSize: number): Promise<{ lng: number; lat: number; count: number }[]>;
-
   getLayers(): Promise<Layer[]>;
   getLayer(id: string): Promise<Layer | undefined>;
   createLayer(layer: InsertLayer): Promise<Layer>;
@@ -91,37 +89,6 @@ export class DatabaseStorage implements IStorage {
     const logs = await db.execute(sql`SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`);
     const countResult = await db.execute(sql`SELECT COUNT(*)::int AS total FROM audit_logs`);
     return { logs: logs.rows, total: (countResult.rows[0] as any)?.total ?? 0 };
-  }
-
-  async getGridAggregation(layerId: string, bbox: number[], gridSize: number): Promise<{ lng: number; lat: number; count: number }[]> {
-    const [minLng, minLat, maxLng, maxLat] = bbox;
-    const size = Math.max(1, gridSize || 10);
-    const lngStep = (maxLng - minLng) / size;
-    const latStep = (maxLat - minLat) / size;
-    if (!lngStep || !latStep) return [];
-
-    const result = await db.execute(sql`
-      SELECT AVG(lng)::float8 AS lng, AVG(lat)::float8 AS lat, count(*)::int AS count
-      FROM (
-        SELECT lng, lat,
-          floor((lng - ${minLng}) / ${lngStep})::int AS gx,
-          floor((lat - ${minLat}) / ${latStep})::int AS gy
-        FROM features
-        WHERE layer_id = ${layerId}
-          AND lng IS NOT NULL AND lat IS NOT NULL
-          AND lng BETWEEN ${minLng} AND ${maxLng}
-          AND lat BETWEEN ${minLat} AND ${maxLat}
-      ) t
-      GROUP BY gx, gy
-      HAVING count(*) > 0
-      ORDER BY count DESC
-      LIMIT 500
-    `);
-    return result.rows.map((r: any) => ({
-      lng: parseFloat(r.lng),
-      lat: parseFloat(r.lat),
-      count: parseInt(r.count),
-    }));
   }
 
   async getLayers(): Promise<Layer[]> {
