@@ -481,7 +481,7 @@ export function AppSidebar({
               </div>
               <div>
                 <h2 className="text-sm font-semibold" data-testid="text-app-title">BIGSPACE Public</h2>
-                <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v0.8</p>
+                <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v0.9</p>
               </div>
             </div>
             <div className="flex items-center gap-0.5">
