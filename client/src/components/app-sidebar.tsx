@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import {
   Layers, Map, Globe, Info, Cpu, CircleDot,
-  Trash2, Plus, Check,
+  Trash2, Plus, Check, PanelLeftClose, PanelLeft,
 } from "lucide-react";
 import {
   Tooltip,
@@ -375,7 +375,7 @@ export function AppSidebar({
   selectedLayerId,
 }: AppSidebarProps) {
   const { toast } = useToast();
-  const { setOpenMobile, isMobile } = useSidebar();
+  const { setOpenMobile, isMobile, toggleSidebar, open } = useSidebar();
 
   const closeMobileIfNeeded = useCallback(() => {
     if (isMobile) setOpenMobile(false);
@@ -471,15 +471,15 @@ export function AppSidebar({
 
   return (
     <>
-      <Sidebar>
+      <Sidebar collapsible="icon">
         {/* Header */}
-        <SidebarHeader className="p-4 pb-3">
+        <SidebarHeader className="p-3 pb-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary text-primary-foreground">
+            <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:gap-0">
+              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-primary text-primary-foreground shrink-0">
                 <Globe className="w-4 h-4" />
               </div>
-              <div>
+              <div className="group-data-[collapsible=icon]:hidden">
                 <h2 className="text-sm font-semibold" data-testid="text-app-title">BIGSPACE Public</h2>
                 <p className="text-[10px] text-muted-foreground" data-testid="text-app-version">v0.9</p>
               </div>
@@ -527,12 +527,26 @@ export function AppSidebar({
               </TooltipProvider>
             </div>
           </div>
+          {/* 접기 버튼 — 모바일에서는 숨김 */}
+          {!isMobile && (
+            <button
+              className="absolute -right-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background shadow-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={toggleSidebar}
+              aria-label={open ? "사이드바 접기" : "사이드바 펼치기"}
+            >
+              {open
+                ? <PanelLeftClose className="w-3 h-3" />
+                : <PanelLeft className="w-3 h-3" />}
+            </button>
+          )}
         </SidebarHeader>
 
         <Separator />
 
-        {/* Search */}
-        <LayerSearch value={searchQuery} onChange={setSearchQuery} />
+        {/* Search — 접힌 상태에서 숨김 */}
+        <div className="group-data-[collapsible=icon]:hidden">
+          <LayerSearch value={searchQuery} onChange={setSearchQuery} />
+        </div>
 
         {/* Layer content */}
         <SidebarContent className="overflow-y-auto scrollbar-none">

@@ -89,12 +89,12 @@ export function LayerRow({
         style={{ backgroundColor: layer.strokeColor }}
       />
 
-      {/* Mini toggle — always visible, leftmost */}
+      {/* Mini toggle — 접힌 상태에서 숨김 */}
       <button
         type="button"
         role="switch"
         aria-checked={layer.visible}
-        className={`relative ml-2 mr-1 shrink-0 h-3.5 w-6 rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+        className={`relative ml-2 mr-1 shrink-0 h-3.5 w-6 rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-data-[collapsible=icon]:hidden ${
           layer.visible ? "bg-primary" : "bg-muted-foreground/25"
         }`}
         onClick={(e) => { e.stopPropagation(); onToggle(layer.id, !layer.visible); }}
@@ -107,18 +107,17 @@ export function LayerRow({
         />
       </button>
 
-      {/* Color dot */}
+      {/* Color dot — 접힌 상태에서도 표시, 가시성에 따라 투명도 변경 */}
       <div
-        className="w-2.5 h-2.5 rounded-full shrink-0"
-        style={{
-          backgroundColor: layer.fillColor,
-          borderColor: layer.strokeColor,
-        }}
+        className={`w-3 h-3 rounded-full shrink-0 transition-opacity group-data-[collapsible=icon]:mx-auto ${
+          inactive ? "opacity-30" : "opacity-100"
+        }`}
+        style={{ backgroundColor: layer.fillColor }}
       />
 
-      {/* Layer name */}
+      {/* Layer name — 접힌 상태에서 숨김 */}
       <span
-        className={`ml-1.5 text-[13px] truncate flex-1 min-w-0 ${
+        className={`ml-1.5 text-[13px] truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden ${
           inactive ? "text-muted-foreground opacity-50" : ""
         }`}
         data-testid={`text-layer-name-${layer.id}`}
@@ -126,8 +125,8 @@ export function LayerRow({
         {layer.name}
       </span>
 
-      {/* Right side: size label or more menu */}
-      <div className="flex items-center gap-0.5 shrink-0 mr-1">
+      {/* Right side: size label or more menu — 접힌 상태에서 숨김 */}
+      <div className="flex items-center gap-0.5 shrink-0 mr-1 group-data-[collapsible=icon]:hidden">
         {hovered ? (
           <>
             {/* Drag handle */}

@@ -73,10 +73,10 @@ export function LayerGroup({
 
   return (
     <div data-testid={`category-label-${category}`}>
-      {/* Group header */}
+      {/* Group header — 접힌 사이드바에서 숨김 */}
       <button
         type="button"
-        className="flex items-center w-full gap-1.5 px-2 py-1 text-left hover:bg-accent/40 transition-colors rounded-sm"
+        className="flex items-center w-full gap-1.5 px-2 py-1 text-left hover:bg-accent/40 transition-colors rounded-sm group-data-[collapsible=icon]:hidden"
         onClick={() => setOpen((prev) => !prev)}
       >
         <ChevronRight
