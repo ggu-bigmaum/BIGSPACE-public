@@ -788,6 +788,107 @@ function BasemapsSection({ basemapList, addingBasemap, setAddingBasemap, newBase
   );
 }
 
+function GridCacheBuilder() {
+  const { data: layerList = [] } = useQuery<any[]>({ queryKey: ["/api/layers"] });
+  const [building, setBuilding] = useState<Record<string, boolean>>({});
+  const [results, setResults] = useState<Record<string, { count: number; time: number } | null>>({});
+  const { toast } = useToast();
+
+  const pointLayers = layerList.filter(
+    (l: any) => l.geometryType === "Point" && (l.featureCount ?? 0) > 0
+  );
+
+  const handleBuild = async (layerId: string, layerName: string) => {
+    setBuilding(prev => ({ ...prev, [layerId]: true }));
+    setResults(prev => ({ ...prev, [layerId]: null }));
+    const start = Date.now();
+    try {
+      const res = await fetch("/api/admin/build-grid-cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layerId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "빌드 실패");
+      const data = await res.json();
+      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+      setResults(prev => ({ ...prev, [layerId]: { count: data.count, time: parseFloat(elapsed) } }));
+      toast({ title: `격자 캐시 빌드 완료`, description: `${layerName}: ${data.count}개 셀 (${elapsed}s)` });
+    } catch (e: any) {
+      toast({ title: "격자 캐시 빌드 실패", description: e.message, variant: "destructive" });
+    } finally {
+      setBuilding(prev => ({ ...prev, [layerId]: false }));
+    }
+  };
+
+  const handleBuildAll = async () => {
+    for (const layer of pointLayers) {
+      await handleBuild(layer.id, layer.name);
+    }
+  };
+
+  if (pointLayers.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-4 text-center">
+        격자 캐시 대상 레이어가 없습니다 (Point 타입 + 피처 있는 레이어 필요).
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Point 레이어의 z16~17 격자 집계를 사전 계산합니다. 데이터 변경 시 리빌드하세요.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleBuildAll}
+          disabled={Object.values(building).some(Boolean)}
+        >
+          {Object.values(building).some(Boolean) ? (
+            <><Loader2 className="w-3 h-3 mr-1 animate-spin" />빌드 중...</>
+          ) : (
+            <><Database className="w-3 h-3 mr-1" />전체 빌드</>
+          )}
+        </Button>
+      </div>
+      <div className="border rounded-lg divide-y">
+        {pointLayers.map((layer: any) => (
+          <div key={layer.id} className="flex items-center justify-between px-4 py-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <BarChart3 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className="text-sm truncate">{layer.name}</span>
+              <Badge variant="secondary" className="text-[10px] shrink-0">
+                {(layer.featureCount ?? 0).toLocaleString()}건
+              </Badge>
+              {results[layer.id] && (
+                <Badge variant="default" className="text-[10px] shrink-0">
+                  <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
+                  {results[layer.id]!.count.toLocaleString()}셀 · {results[layer.id]!.time}s
+                </Badge>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleBuild(layer.id, layer.name)}
+              disabled={building[layer.id]}
+              className="shrink-0 h-7 text-xs"
+            >
+              {building[layer.id] ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                "빌드"
+              )}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RenderingSection({ settings, onUpdate }: { settings: AppSetting[]; onUpdate: (key: string, value: any) => void }) {
   return (
     <div className="space-y-6" data-testid="section-rendering">
@@ -811,6 +912,15 @@ function RenderingSection({ settings, onUpdate }: { settings: AppSetting[]; onUp
       {settings.length === 0 && (
         <p className="text-sm text-muted-foreground py-8 text-center">설정이 아직 로드되지 않았습니다.</p>
       )}
+
+      {/* 격자 캐시 빌드 */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-3">
+          <Database className="w-3 h-3 text-primary" />
+          격자 집계 캐시
+        </h3>
+        <GridCacheBuilder />
+      </div>
     </div>
   );
 }

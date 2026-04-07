@@ -1054,10 +1054,8 @@ export async function registerRoutes(
   });
 
   // 격자 집계 캐시 빌드 (≈300m 격자 전국 단위 사전 계산)
+  // TODO: requireAdmin으로 전환 (구글 로그인 테스트 완료 후)
   app.post("/api/admin/build-grid-cache", requireAuth, async (req, res) => {
-    if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
     const { layerId } = req.body;
     if (!layerId) return res.status(400).json({ error: "layerId required" });
     try {
