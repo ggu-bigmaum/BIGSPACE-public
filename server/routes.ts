@@ -371,10 +371,40 @@ export async function registerRoutes(
     const parsedBbox = (bbox as string).split(",").map(Number);
     if (parsedBbox.length !== 4) return res.status(400).json({ message: "Invalid bbox" });
 
-    const size = Math.max(1, parseInt(gridSize as string, 10) || 10);
+    const CELL_SIZE = 0.0027; // ≈300m 고정
     try {
-      const grid = await storage.getGridAggregation(req.params.id, parsedBbox, size);
-      res.json(grid);
+      // 캐시 우선 조회
+      const cached = await storage.getGridCache(req.params.id, CELL_SIZE, parsedBbox);
+      if (cached.length > 0) return res.json(cached);
+
+      // 캐시 없으면 실시간 집계 (fallback)
+      const [minLng, minLat, maxLng, maxLat] = parsedBbox;
+      const size = Math.max(1, parseInt(gridSize as string, 10) || 10);
+      const lngStep = (maxLng - minLng) / size;
+      const latStep = (maxLat - minLat) / size;
+      const result = await pool.query(
+        `SELECT AVG(lng)::float8 AS lng, AVG(lat)::float8 AS lat, count(*)::int AS count
+         FROM (
+           SELECT lng, lat,
+             floor((lng - $1) / $3)::int AS gx,
+             floor((lat - $2) / $4)::int AS gy
+           FROM features
+           WHERE layer_id = $5
+             AND lng IS NOT NULL AND lat IS NOT NULL
+             AND lng BETWEEN $1 AND $6
+             AND lat BETWEEN $2 AND $7
+         ) t
+         GROUP BY gx, gy
+         HAVING count(*) > 0
+         ORDER BY count DESC
+         LIMIT 500`,
+        [minLng, minLat, lngStep, latStep, req.params.id, maxLng, maxLat]
+      );
+      res.json(result.rows.map((r: any) => ({
+        lng: parseFloat(r.lng),
+        lat: parseFloat(r.lat),
+        count: parseInt(r.count),
+      })));
     } catch (err: any) {
       console.error("[aggregate] error:", err?.message || err);
       res.status(500).json({ message: "aggregate failed" });
@@ -998,6 +1028,23 @@ export async function registerRoutes(
       res.json({ level, layerId, count: rows.length });
     } catch (e: any) {
       console.error("build-boundary-cache error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // 격자 집계 캐시 빌드 (≈300m 격자 전국 단위 사전 계산)
+  app.post("/api/admin/build-grid-cache", requireAuth, async (req, res) => {
+    if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const { layerId } = req.body;
+    if (!layerId) return res.status(400).json({ error: "layerId required" });
+    try {
+      const CELL_SIZE = 0.0027;
+      const count = await storage.buildGridCache(layerId, CELL_SIZE);
+      res.json({ layerId, cellSize: CELL_SIZE, count });
+    } catch (e: any) {
+      console.error("build-grid-cache error:", e);
       res.status(500).json({ error: e.message });
     }
   });

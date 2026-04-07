@@ -187,6 +187,24 @@ export const boundaryAggregateCache = pgTable("boundary_aggregate_cache", {
 
 export type BoundaryAggregateCache = typeof boundaryAggregateCache.$inferSelect;
 
+// 격자 집계 캐시 — z16~17 응답 속도 개선용
+export const gridAggregateCache = pgTable("grid_aggregate_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  layerId: varchar("layer_id").notNull(),
+  cellSize: real("cell_size").notNull(),    // 격자 크기(도 단위, 예: 0.0027)
+  gx: integer("gx").notNull(),              // 격자 X 인덱스
+  gy: integer("gy").notNull(),              // 격자 Y 인덱스
+  lng: real("lng").notNull(),               // 격자 내 점들의 평균 경도
+  lat: real("lat").notNull(),               // 격자 내 점들의 평균 위도
+  count: integer("count").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_grid_cache_layer_cell").on(table.layerId, table.cellSize),
+  index("idx_grid_cache_coords").on(table.layerId, table.cellSize, table.gx, table.gy),
+]);
+
+export type GridAggregateCache = typeof gridAggregateCache.$inferSelect;
+
 export const spatialQueries = pgTable("spatial_queries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),

@@ -6,7 +6,7 @@ import {
   type Basemap, type InsertBasemap,
   type AppSetting, type InsertAppSetting,
   type AdminBoundary, type InsertAdminBoundary,
-  users, layers, features, spatialQueries, basemaps, appSettings, administrativeBoundaries, boundaryAggregateCache,
+  users, layers, features, spatialQueries, basemaps, appSettings, administrativeBoundaries, boundaryAggregateCache, gridAggregateCache,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
@@ -37,6 +37,8 @@ export interface IStorage {
 
   getFeaturesInRadius(lng: number, lat: number, radiusKm: number, layerIds?: string[]): Promise<Feature[]>;
   getFeaturesInBbox(layerId: string, bbox: number[], limit: number): Promise<{ count: number; features: { id: string; lng: number; lat: number; properties: any }[] }>;
+  getGridCache(layerId: string, cellSize: number, bbox: number[]): Promise<{ lng: number; lat: number; count: number }[]>;
+  buildGridCache(layerId: string, cellSize: number): Promise<number>;
 
   createSpatialQuery(query: InsertSpatialQuery): Promise<SpatialQuery>;
   getSpatialQueries(): Promise<SpatialQuery[]>;
@@ -277,6 +279,58 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+
+  async getGridCache(layerId: string, cellSize: number, bbox: number[]): Promise<{ lng: number; lat: number; count: number }[]> {
+    const [minLng, minLat, maxLng, maxLat] = bbox;
+    const result = await db.execute(sql`
+      SELECT lng, lat, count
+      FROM grid_aggregate_cache
+      WHERE layer_id = ${layerId}
+        AND cell_size = ${cellSize}
+        AND lng BETWEEN ${minLng} AND ${maxLng}
+        AND lat BETWEEN ${minLat} AND ${maxLat}
+      ORDER BY count DESC
+      LIMIT 500
+    `);
+    return result.rows.map((r: any) => ({
+      lng: parseFloat(r.lng),
+      lat: parseFloat(r.lat),
+      count: parseInt(r.count),
+    }));
+  }
+
+  async buildGridCache(layerId: string, cellSize: number): Promise<number> {
+    // 기존 캐시 삭제
+    await db.execute(sql`
+      DELETE FROM grid_aggregate_cache
+      WHERE layer_id = ${layerId} AND cell_size = ${cellSize}
+    `);
+
+    // 전체 피처를 격자로 집계해서 캐시 테이블에 삽입
+    const result = await db.execute(sql`
+      INSERT INTO grid_aggregate_cache (id, layer_id, cell_size, gx, gy, lng, lat, count)
+      SELECT
+        gen_random_uuid(),
+        ${layerId},
+        ${cellSize}::real,
+        gx, gy,
+        AVG(lng)::real,
+        AVG(lat)::real,
+        count(*)::int
+      FROM (
+        SELECT lng, lat,
+          floor(lng / ${cellSize})::int AS gx,
+          floor(lat / ${cellSize})::int AS gy
+        FROM features
+        WHERE layer_id = ${layerId}
+          AND lng IS NOT NULL AND lat IS NOT NULL
+      ) t
+      GROUP BY gx, gy
+      HAVING count(*) > 0
+      RETURNING id
+    `);
+    return result.rows.length;
+  }
 
   async createSpatialQuery(query: InsertSpatialQuery): Promise<SpatialQuery> {
     const [created] = await db.insert(spatialQueries).values(query).returning();
