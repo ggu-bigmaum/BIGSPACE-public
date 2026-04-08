@@ -464,7 +464,7 @@ export async function registerRoutes(
     if (isNaN(pLng) || isNaN(pLat) || isNaN(pRadius)) {
       return res.status(400).json({ message: "lng, lat, radius must be valid numbers" });
     }
-    const MAX_RADIUS = 50000; // 50km
+    const MAX_RADIUS = 5000; // 5km (데모 제한)
     if (pRadius <= 0 || pRadius > MAX_RADIUS) {
       return res.status(400).json({ message: `radius must be between 0 and ${MAX_RADIUS}m` });
     }

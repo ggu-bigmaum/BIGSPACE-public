@@ -8,7 +8,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("viewer"), // "admin" | "viewer"
+  role: text("role").notNull().default("admin"), // "admin" | "viewer" — 데모: 전원 admin, 운영 전환 시 "viewer"로 변경
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
