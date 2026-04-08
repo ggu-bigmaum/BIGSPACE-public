@@ -15,6 +15,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  createUserWithAutoAdmin(user: InsertUser): Promise<User>;
   getUserCount(): Promise<number>;
   promoteToAdmin(userId: string): Promise<void>;
   getAuditLogs(limit: number, offset: number): Promise<{ logs: any[]; total: number }>;
@@ -74,6 +75,23 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  /** 유저 생성 + 첫 유저면 admin 승격 (트랜잭션으로 레이스컨디션 방지) */
+  async createUserWithAutoAdmin(insertUser: InsertUser): Promise<User> {
+    return db.transaction(async (tx) => {
+      // 트랜잭션 내에서 배타 잠금으로 유저 수 확인
+      const countResult = await tx.execute(sql`SELECT count(*)::int AS cnt FROM users FOR UPDATE`);
+      const currentCount = (countResult.rows[0] as any)?.cnt ?? 0;
+
+      const [user] = await tx.insert(users).values(insertUser).returning();
+
+      if (currentCount === 0) {
+        await tx.update(users).set({ role: "admin" }).where(eq(users.id, user.id));
+        user.role = "admin";
+      }
+      return user;
+    });
   }
 
   async getUserCount(): Promise<number> {

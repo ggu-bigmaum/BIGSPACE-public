@@ -9,6 +9,7 @@ import { db } from "./db";
 import multer from "multer";
 import proj4 from "proj4";
 import * as fs from "fs";
+import * as crypto from "crypto";
 import * as https from "https";
 import * as shapefile from "shapefile";
 import passport from "passport";
@@ -82,14 +83,7 @@ export async function registerRoutes(
       }
 
       const hashed = await hashPassword(password);
-      const user = await storage.createUser({ username, password: hashed });
-
-      // 첫 번째 사용자는 자동으로 admin 승격
-      const userCount = await storage.getUserCount();
-      if (userCount <= 1) {
-        await storage.promoteToAdmin(user.id);
-        user.role = "admin";
-      }
+      const user = await storage.createUserWithAutoAdmin({ username, password: hashed });
 
       // 자동 로그인
       req.login(user, (err) => {
@@ -161,12 +155,9 @@ export async function registerRoutes(
       // 기존 유저 조회 또는 신규 생성
       let user = await storage.getUserByUsername(email);
       if (!user) {
-        const userCount = await storage.getUserCount();
-        user = await storage.createUser({ username: email, password: "!oauth-no-local-login!" });
-        if (userCount === 0) {
-          await storage.promoteToAdmin(user.id);
-          user.role = "admin";
-        }
+        // OAuth 유저는 랜덤 해시로 비밀번호 설정 — local login 차단
+        const oauthPassword = await hashPassword(crypto.randomUUID());
+        user = await storage.createUserWithAutoAdmin({ username: email, password: oauthPassword });
       }
 
       req.login(user, (err) => {
