@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, real, jsonb, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, real, jsonb, timestamp, index, foreignKey } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -34,6 +34,8 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("idx_audit_logs_created_at").on(table.createdAt),
+  index("idx_audit_logs_user_id").on(table.userId),
+  foreignKey({ columns: [table.userId], foreignColumns: [users.id] }).onDelete("set null"),
 ]);
 
 export type AuditLog = typeof auditLogs.$inferSelect;
@@ -43,6 +45,7 @@ export const layers = pgTable("layers", {
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull().default("일반"),
+  subCategory: text("sub_category"),
   geometryType: text("geometry_type").notNull().default("Point"),
   srid: integer("srid").notNull().default(4326),
   renderMode: text("render_mode").notNull().default("auto"),
@@ -95,6 +98,7 @@ export const features = pgTable("features", {
 }, (table) => [
   index("idx_features_layer_id").on(table.layerId),
   index("idx_features_layer_lng_lat").on(table.layerId, table.lng, table.lat),
+  foreignKey({ columns: [table.layerId], foreignColumns: [layers.id] }).onDelete("cascade"),
 ]);
 
 export const featuresRelations = relations(features, ({ one }) => ({
@@ -184,6 +188,8 @@ export const boundaryAggregateCache = pgTable("boundary_aggregate_cache", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("idx_boundary_cache_layer_level").on(table.layerId, table.level),
+  foreignKey({ columns: [table.layerId], foreignColumns: [layers.id] }).onDelete("cascade"),
+  foreignKey({ columns: [table.boundaryId], foreignColumns: [administrativeBoundaries.id] }).onDelete("cascade"),
 ]);
 
 export type BoundaryAggregateCache = typeof boundaryAggregateCache.$inferSelect;
@@ -202,6 +208,7 @@ export const gridAggregateCache = pgTable("grid_aggregate_cache", {
 }, (table) => [
   index("idx_grid_cache_layer_cell").on(table.layerId, table.cellSize),
   index("idx_grid_cache_coords").on(table.layerId, table.cellSize, table.gx, table.gy),
+  foreignKey({ columns: [table.layerId], foreignColumns: [layers.id] }).onDelete("cascade"),
 ]);
 
 export type GridAggregateCache = typeof gridAggregateCache.$inferSelect;

@@ -111,7 +111,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteLayer(id: string): Promise<boolean> {
-    await db.delete(features).where(eq(features.layerId, id));
+    // features, boundary_aggregate_cache, grid_aggregate_cache는 FK CASCADE로 자동 삭제
     const result = await db.delete(layers).where(eq(layers.id, id)).returning();
     return result.length > 0;
   }
