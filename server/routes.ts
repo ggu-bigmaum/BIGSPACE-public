@@ -458,13 +458,18 @@ export async function registerRoutes(
     if (!lng || !lat || !radius) {
       return res.status(400).json({ message: "lng, lat, radius required" });
     }
+    const pLng = parseFloat(lng as string);
+    const pLat = parseFloat(lat as string);
+    const pRadius = parseFloat(radius as string);
+    if (isNaN(pLng) || isNaN(pLat) || isNaN(pRadius)) {
+      return res.status(400).json({ message: "lng, lat, radius must be valid numbers" });
+    }
+    const MAX_RADIUS = 50000; // 50km
+    if (pRadius <= 0 || pRadius > MAX_RADIUS) {
+      return res.status(400).json({ message: `radius must be between 0 and ${MAX_RADIUS}m` });
+    }
     const parsedLayerIds = layerIds ? (layerIds as string).split(",") : undefined;
-    const features = await storage.getFeaturesInRadius(
-      parseFloat(lng as string),
-      parseFloat(lat as string),
-      parseFloat(radius as string),
-      parsedLayerIds,
-    );
+    const features = await storage.getFeaturesInRadius(pLng, pLat, pRadius, parsedLayerIds);
 
     await storage.createSpatialQuery({
       name: `Radius search at [${lng}, ${lat}]`,
@@ -885,6 +890,10 @@ export async function registerRoutes(
         }
       });
     } catch (e: any) {
+      // 실패 시 temp 파일 정리
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch {}
+      }
       console.error("Admin boundary upload error:", e);
       res.status(500).json({ message: e.message });
     }
@@ -951,13 +960,14 @@ export async function registerRoutes(
             );
             return `(COALESCE($${base+1}::varchar, gen_random_uuid()::varchar),$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9},$${base+10})`;
           });
-          await client.query(
+          const insertResult = await client.query(
             `INSERT INTO features (id,layer_id,geometry,properties,lng,lat,min_lng,min_lat,max_lng,max_lat)
              VALUES ${placeholders.join(",")}
-             ON CONFLICT (id) DO NOTHING`,
+             ON CONFLICT (id) DO NOTHING
+             RETURNING id`,
             params
           );
-          inserted += chunk.length;
+          inserted += insertResult.rowCount ?? 0;
         }
         await client.query("COMMIT");
 

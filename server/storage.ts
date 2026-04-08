@@ -552,6 +552,9 @@ export class DatabaseStorage implements IStorage {
     const b = boundsResult.rows[0] as any;
     const bounds = b && b.min_lng != null ? [b.min_lng, b.min_lat, b.max_lng, b.max_lat] : null;
     await db.update(layers).set({ featureCount: count, bounds }).where(eq(layers.id, layerId));
+
+    // feature 변경 시 해당 레이어의 boundary cache 무효화
+    await db.delete(boundaryAggregateCache).where(eq(boundaryAggregateCache.layerId, layerId));
   }
 
   async getMvtTile(layerId: string, z: number, x: number, y: number): Promise<Buffer | null> {
