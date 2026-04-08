@@ -9,10 +9,13 @@ import { db } from "./db";
 import multer from "multer";
 import proj4 from "proj4";
 import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 import * as crypto from "crypto";
 import * as https from "https";
 import * as shapefile from "shapefile";
 import passport from "passport";
+import rateLimit from "express-rate-limit";
 import { hashPassword, requireAuth, requireAdmin } from "./auth";
 
 const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 1024 * 1024 * 1024 } }); // 1GB
@@ -62,12 +65,21 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  // Rate limiter — 로그인/회원가입 brute force 방지 (GS 인증 1-1)
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15분
+    max: 20,                   // 15분당 최대 20회
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "요청이 너무 많습니다. 15분 후 다시 시도하세요." },
+  });
+
   // ══════════════════════════════════════════════════════════════════════
   // 인증 API (GS 인증 1-1, 1-2, 1-6)
   // ══════════════════════════════════════════════════════════════════════
 
   /** 회원가입 */
-  app.post("/api/auth/register", async (req: Request, res: Response) => {
+  app.post("/api/auth/register", authLimiter, async (req: Request, res: Response) => {
     try {
       const { username, password } = req.body;
       if (!username || !password) {
@@ -98,7 +110,7 @@ export async function registerRoutes(
   });
 
   /** 로그인 */
-  app.post("/api/auth/login", (req: Request, res: Response, next) => {
+  app.post("/api/auth/login", authLimiter, (req: Request, res: Response, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return res.status(500).json({ message: "서버 오류가 발생했습니다." });
       if (!user) {
@@ -129,7 +141,7 @@ export async function registerRoutes(
   });
 
   /** Google 로그인 (Firebase ID 토큰 검증) */
-  app.post("/api/auth/google", async (req: Request, res: Response) => {
+  app.post("/api/auth/google", authLimiter, async (req: Request, res: Response) => {
     try {
       const { idToken } = req.body;
       if (!idToken) return res.status(400).json({ message: "토큰이 없습니다." });
@@ -182,7 +194,7 @@ export async function registerRoutes(
 
   /** 감사 로그 조회 (admin only) */
   // TODO: requireAdmin으로 전환 예정 (현재 테스트 중이라 requireAuth 유지)
-  app.get("/api/admin/audit-logs", requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  app.get("/api/admin/audit-logs", requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
     const offset = parseInt(req.query.offset as string) || 0;
     const data = await storage.getAuditLogs(limit, offset);
@@ -484,7 +496,7 @@ export async function registerRoutes(
   });
 
   // VWorld WMS 프록시 (CORS 및 API 키 보호)
-  app.get("/api/proxy/wms", (req, res) => {
+  app.get("/api/proxy/wms", requireAuth, (req, res) => {
     const params = new URLSearchParams(req.query as Record<string, string>);
     params.set("KEY", process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "");
     params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
@@ -514,7 +526,7 @@ export async function registerRoutes(
   });
 
   // VWorld WFS 프록시 (CORS 및 API 키 보호)
-  app.get("/api/proxy/wfs", (req, res) => {
+  app.get("/api/proxy/wfs", requireAuth, (req, res) => {
     const params = new URLSearchParams(req.query as Record<string, string>);
     params.set("KEY", process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "");
     params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
@@ -746,33 +758,34 @@ export async function registerRoutes(
         featuresList = fc.features;
         fs.unlinkSync(filePath);
       } else if (originalName.endsWith('.zip')) {
-        const { execSync } = await import('child_process');
-        const tmpDir = `/tmp/shp_extract_${Date.now()}`;
+        const AdmZip = (await import('adm-zip')).default;
+        const zip = new AdmZip(filePath);
+        const tmpDir = path.join(os.tmpdir(), `shp_extract_${Date.now()}`);
         fs.mkdirSync(tmpDir, { recursive: true });
-        execSync(`unzip -o "${filePath}" -d "${tmpDir}"`, { encoding: 'utf-8' });
+        zip.extractAllTo(tmpDir, true);
         fs.unlinkSync(filePath);
 
         const files = fs.readdirSync(tmpDir);
         const shpFile = files.find(f => f.endsWith('.shp'));
         const dbfFile = files.find(f => f.endsWith('.dbf'));
         if (!shpFile || !dbfFile) {
-          execSync(`rm -rf "${tmpDir}"`);
+          fs.rmSync(tmpDir, { recursive: true, force: true });
           return res.status(400).json({ message: "ZIP 내에 .shp 및 .dbf 파일이 필요합니다" });
         }
 
         const cpgFile = files.find(f => f.endsWith('.cpg'));
         let encoding = 'utf-8';
         if (cpgFile) {
-          encoding = fs.readFileSync(`${tmpDir}/${cpgFile}`, 'utf-8').trim() || 'utf-8';
+          encoding = fs.readFileSync(path.join(tmpDir, cpgFile), 'utf-8').trim() || 'utf-8';
         }
 
-        const source = await shapefile.open(`${tmpDir}/${shpFile}`, `${tmpDir}/${dbfFile}`, { encoding });
+        const source = await shapefile.open(path.join(tmpDir, shpFile), path.join(tmpDir, dbfFile), { encoding });
         while (true) {
           const result = await source.read();
           if (result.done) break;
           featuresList.push(result.value);
         }
-        execSync(`rm -rf "${tmpDir}"`);
+        fs.rmSync(tmpDir, { recursive: true, force: true });
       } else {
         fs.unlinkSync(filePath);
         return res.status(400).json({ message: "지원 형식: .zip (Shapefile), .geojson, .json" });
@@ -1037,7 +1050,7 @@ export async function registerRoutes(
   });
 
   // 경계 집계 캐시 빌드 (레이어×레벨 단위, 기존 캐시 삭제 후 재계산)
-  app.post("/api/admin/build-boundary-cache", requireAuth, async (req, res) => {
+  app.post("/api/admin/build-boundary-cache", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -1059,7 +1072,7 @@ export async function registerRoutes(
 
   // 격자 집계 캐시 빌드 (≈300m 격자 전국 단위 사전 계산)
   // TODO: requireAdmin으로 전환 (구글 로그인 테스트 완료 후)
-  app.post("/api/admin/build-grid-cache", requireAuth, async (req, res) => {
+  app.post("/api/admin/build-grid-cache", requireAdmin, async (req, res) => {
     const { layerId } = req.body;
     if (!layerId) return res.status(400).json({ error: "layerId required" });
     try {
