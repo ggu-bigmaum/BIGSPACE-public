@@ -18,6 +18,7 @@ const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 1024 * 1024 *
 
 const NCP_CLIENT_ID = process.env.NCP_CLIENT_ID || "";
 const NCP_CLIENT_SECRET = process.env.NCP_CLIENT_SECRET || "";
+const GRID_CELL_SIZE = 0.0027; // ≈300m 격자 단위
 
 // ── 비동기 에러 래퍼 — try-catch 없는 라우트도 안전하게 처리 ──
 type AsyncHandler = (req: Request, res: Response) => Promise<any>;
@@ -225,6 +226,7 @@ export async function registerRoutes(
     name: z.string().min(1).optional(),
     description: z.string().nullable().optional(),
     category: z.string().transform(v => v.trim() || "일반").optional(),
+    subCategory: z.string().nullable().optional(),
     visible: z.boolean().optional(),
     opacity: z.number().min(0).max(1).optional(),
     strokeColor: z.string().optional(),
@@ -344,7 +346,7 @@ export async function registerRoutes(
         const created = await storage.createFeatures(featureList);
 
         // 배치 추가 후 격자 캐시 자동 리빌드 (백그라운드)
-        const CELL_SIZE = 0.0027;
+        const CELL_SIZE = GRID_CELL_SIZE;
         storage.buildGridCache(req.params.id, CELL_SIZE)
           .then(cnt => console.log(`[auto] Grid cache rebuilt for layer ${req.params.id}: ${cnt} cells`))
           .catch(err => console.error(`[auto] Grid cache rebuild failed:`, err?.message || err));
@@ -367,7 +369,7 @@ export async function registerRoutes(
     const count = await storage.deleteFeaturesByLayer(req.params.id);
 
     // 피처 삭제 시 격자 캐시도 제거 (백그라운드)
-    const CELL_SIZE = 0.0027;
+    const CELL_SIZE = GRID_CELL_SIZE;
     storage.buildGridCache(req.params.id, CELL_SIZE)
       .then(cnt => console.log(`[auto] Grid cache rebuilt after delete for layer ${req.params.id}: ${cnt} cells`))
       .catch(err => console.error(`[auto] Grid cache rebuild failed:`, err?.message || err));
@@ -396,7 +398,7 @@ export async function registerRoutes(
     const parsedBbox = (bbox as string).split(",").map(Number);
     if (parsedBbox.length !== 4) return res.status(400).json({ message: "Invalid bbox" });
 
-    const CELL_SIZE = 0.0027; // ≈300m 고정
+    const CELL_SIZE = GRID_CELL_SIZE; // ≈300m 고정
     try {
       // 캐시 우선 조회
       const cached = await storage.getGridCache(req.params.id, CELL_SIZE, parsedBbox);
@@ -956,7 +958,7 @@ export async function registerRoutes(
         await client.query("COMMIT");
 
         // 임포트 완료 후 격자 캐시 자동 빌드 (백그라운드, 응답 차단 안함)
-        const CELL_SIZE = 0.0027;
+        const CELL_SIZE = GRID_CELL_SIZE;
         storage.buildGridCache(layerId, CELL_SIZE)
           .then(cnt => console.log(`[auto] Grid cache built for layer ${layerId}: ${cnt} cells`))
           .catch(err => console.error(`[auto] Grid cache build failed for ${layerId}:`, err?.message || err));
@@ -1070,7 +1072,7 @@ export async function registerRoutes(
     const { layerId } = req.body;
     if (!layerId) return res.status(400).json({ error: "layerId required" });
     try {
-      const CELL_SIZE = 0.0027;
+      const CELL_SIZE = GRID_CELL_SIZE;
       const count = await storage.buildGridCache(layerId, CELL_SIZE);
       res.json({ layerId, cellSize: CELL_SIZE, count });
     } catch (e: any) {
