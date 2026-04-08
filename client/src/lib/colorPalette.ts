@@ -4,32 +4,36 @@ export interface LayerColor {
   label: string;
 }
 
-export const LAYER_PALETTE: LayerColor[] = [
-  { strokeColor: "#0d9488", fillColor: "#0d948850", label: "틸" },
-  { strokeColor: "#6366f1", fillColor: "#6366f150", label: "인디고" },
-  { strokeColor: "#0284c7", fillColor: "#0284c750", label: "스카이" },
-  { strokeColor: "#7c3aed", fillColor: "#7c3aed50", label: "바이올렛" },
-  { strokeColor: "#ca8a04", fillColor: "#ca8a0440", label: "앰버" },
-  { strokeColor: "#dc2626", fillColor: "#dc262640", label: "레드" },
-  { strokeColor: "#059669", fillColor: "#05966950", label: "에메랄드" },
-  { strokeColor: "#d97706", fillColor: "#d9770640", label: "오렌지" },
-  { strokeColor: "#4f46e5", fillColor: "#4f46e550", label: "코발트" },
-  { strokeColor: "#db2777", fillColor: "#db277740", label: "핑크" },
-  { strokeColor: "#2563eb", fillColor: "#2563eb50", label: "블루" },
-  { strokeColor: "#65a30d", fillColor: "#65a30d40", label: "라임" },
-  { strokeColor: "#475569", fillColor: "#47556940", label: "슬레이트" },
-  { strokeColor: "#9333ea", fillColor: "#9333ea40", label: "퍼플" },
-  { strokeColor: "#0891b2", fillColor: "#0891b250", label: "시안" },
-  { strokeColor: "#ea580c", fillColor: "#ea580c40", label: "탄제린" },
+export interface ColorFamily {
+  label: string;
+  shades: string[]; // light → dark
+}
+
+export const COLOR_FAMILIES: ColorFamily[] = [
+  { label: "기본 (인디고)", shades: ["#a5b4fc", "#818cf8", "#6366f1", "#4f46e5", "#3730a3"] },
+  { label: "붉은 계열",    shades: ["#fca5a5", "#f87171", "#ef4444", "#dc2626", "#991b1b"] },
+  { label: "푸른 계열",    shades: ["#93c5fd", "#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"] },
+  { label: "초록 계열",    shades: ["#86efac", "#4ade80", "#22c55e", "#16a34a", "#166534"] },
+  { label: "보라 계열",    shades: ["#d8b4fe", "#c084fc", "#a855f7", "#9333ea", "#6b21a8"] },
+  { label: "노란/앰버",    shades: ["#fde68a", "#fbbf24", "#f59e0b", "#d97706", "#92400e"] },
+  { label: "틸/청록",      shades: ["#5eead4", "#2dd4bf", "#14b8a6", "#0d9488", "#115e59"] },
+  { label: "슬레이트",     shades: ["#e2e8f0", "#94a3b8", "#64748b", "#475569", "#1e293b"] },
 ];
+
+// 팔레트에서 색상 자동 배정용 (기존 호환)
+export const LAYER_PALETTE: LayerColor[] = COLOR_FAMILIES.flatMap((fam) =>
+  fam.shades.slice(1, 4).map((shade) => ({
+    strokeColor: shade,
+    fillColor: shade,
+    label: fam.label,
+  }))
+);
 
 export function getNextColor(existingStrokeColors: string[]): LayerColor {
   const used = new Set(existingStrokeColors.map((c) => c.toLowerCase()));
-  for (const color of LAYER_PALETTE) {
-    if (!used.has(color.strokeColor.toLowerCase())) {
-      return color;
-    }
-  }
-  const idx = existingStrokeColors.length % LAYER_PALETTE.length;
-  return LAYER_PALETTE[idx];
+  // 각 계열의 중간 색상(index 2) 우선 배정
+  const candidates = COLOR_FAMILIES.map((f) => f.shades[2]);
+  const pick = candidates.find((c) => !used.has(c.toLowerCase()));
+  const stroke = pick ?? candidates[existingStrokeColors.length % candidates.length];
+  return { strokeColor: stroke, fillColor: stroke, label: "" };
 }

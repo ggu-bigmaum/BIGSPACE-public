@@ -18,11 +18,10 @@ export function BasemapPicker() {
   const activeBasemap = enabledBasemaps.find(b => b.isDefault) || enabledBasemaps[0];
 
   return (
-    <div className="absolute bottom-3 right-20 z-10">
-      <div className="relative" ref={pickerRef}>
-        <button
+    <div className="relative" ref={pickerRef}>
+      <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 px-3 py-1.5 bg-background/90 backdrop-blur-md border border-border rounded-lg shadow-md text-[12px] text-foreground hover:bg-accent transition-colors"
+          className="flex items-center gap-2 px-2.5 py-1 bg-background/80 backdrop-blur-sm border border-border rounded-md shadow-md text-[10px] text-foreground hover:bg-accent transition-colors"
           data-testid="button-basemap-picker"
         >
           <Layers className="w-3.5 h-3.5 text-muted-foreground" />
@@ -51,7 +50,6 @@ export function BasemapPicker() {
             ))}
           </div>
         )}
-      </div>
     </div>
   );
 }

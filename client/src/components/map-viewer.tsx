@@ -17,6 +17,7 @@ import { useBasemapSync } from "@/hooks/useBasemapSync";
 import { useLayerRenderer } from "@/hooks/useLayerRenderer";
 import { useActiveBasemap, BasemapPicker } from "@/components/map/BasemapPicker";
 import { ZoomControl } from "@/components/map/ZoomControl";
+import { formatCoordinate, getApproxScale } from "@/lib/mapUtils";
 import { MapSearchBox } from "@/components/map/MapSearchBox";
 import { FeaturePopup } from "@/components/map/FeaturePopup";
 
@@ -239,14 +240,26 @@ export function MapViewer({
         </Button>
       </div>
 
-      <ZoomControl
-        zoom={mapView.zoom}
-        cursorCoord={cursorCoord}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-      />
+      {/* Bottom-left: scale + coordinates */}
+      <div className="absolute left-3 bottom-3 z-10 flex items-center gap-2 px-2.5 py-1 bg-background/80 backdrop-blur-sm border border-border rounded-md text-[10px] font-mono text-muted-foreground w-[240px] whitespace-nowrap overflow-hidden">
+        <span data-testid="text-scale-ratio">1:{getApproxScale(mapView.zoom)}</span>
+        {cursorCoord && (
+          <>
+            <span className="text-border">|</span>
+            <span>{formatCoordinate(cursorCoord[1], "lat")}, {formatCoordinate(cursorCoord[0], "lng")}</span>
+          </>
+        )}
+      </div>
 
-      <BasemapPicker />
+      {/* Bottom-right controls: zoom + basemap picker */}
+      <div className="absolute right-3 bottom-3 z-10 flex items-center gap-2">
+        <ZoomControl
+          zoom={mapView.zoom}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+        />
+        <BasemapPicker />
+      </div>
 
       <FeaturePopup
         ref={popupRef}

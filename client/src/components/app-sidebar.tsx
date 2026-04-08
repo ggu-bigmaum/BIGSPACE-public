@@ -167,13 +167,24 @@ function LayerEditSheet({
                 />
               </div>
               <div>
-                <Label className="text-xs">카테고리</Label>
+                <Label className="text-xs">카테고리 (대분류)</Label>
                 <Input
                   className="h-8 text-xs mt-1"
                   defaultValue={layer?.category}
                   key={`cat-${layer?.id}`}
                   onChange={(e) => debouncedUpdate("category", e.target.value || "일반")}
                   data-testid={`input-edit-category-${layer?.id}`}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">중분류 (선택)</Label>
+                <Input
+                  className="h-8 text-xs mt-1"
+                  defaultValue={layer?.subCategory ?? ""}
+                  key={`subcat-${layer?.id}`}
+                  placeholder="예: 용도지역"
+                  onChange={(e) => debouncedUpdate("subCategory", e.target.value || null)}
+                  data-testid={`input-edit-subcategory-${layer?.id}`}
                 />
               </div>
             </div>

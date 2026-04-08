@@ -258,158 +258,56 @@ async function upsertBoundaryLayers() {
   }
 }
 
+async function upsertVWorldLayers() {
+  const existingLayers = await storage.getLayers();
+  const existingNames = new Set(existingLayers.map(l => l.name));
+
+  const vworldLayers = [
+    {
+      name: "도시지역",
+      description: "용도지역도 — 도시지역 (lt_c_uq111)",
+      category: "VWorld",
+      subCategory: "용도지역",
+      wmsLayers: "lt_c_uq111",
+    },
+  ];
+
+  for (const vl of vworldLayers) {
+    if (existingNames.has(vl.name)) continue;
+    await storage.createLayer({
+      name: vl.name,
+      description: vl.description,
+      category: vl.category,
+      subCategory: vl.subCategory,
+      geometryType: "Polygon",
+      srid: 4326,
+      renderMode: "feature",
+      featureLimit: 5000,
+      minZoomForFeatures: 11,
+      minZoomForClusters: 0,
+      tileEnabled: false,
+      tileMaxZoom: 14,
+      visible: false,
+      opacity: 0.8,
+      strokeColor: "#6366f1",
+      fillColor: "#6366f130",
+      strokeWidth: 1,
+      pointRadius: 4,
+      wmsUrl: "/api/proxy/wms",
+      wmsLayers: vl.wmsLayers,
+    });
+    console.log(`Created VWorld layer: ${vl.name}`);
+  }
+}
+
 export async function seedDatabase() {
   await upsertBasemaps();
   await upsertSettings();
   await upsertEmergencyLayers();
   await upsertBoundaryLayers();
+  await upsertVWorldLayers();
 
-  const existingLayers = await storage.getLayers();
-  const hasSampleLayers = existingLayers.some(l =>
-    l.name === "Public Facilities" || l.name === "Major Roads"
-  );
-  if (hasSampleLayers) {
-    console.log(`Sample layers already exist. Skipping sample layer seed.`);
-    return;
-  }
-
-  console.log("Seeding database with sample GIS data...");
-
-  const facilityLayer = await storage.createLayer({
-    name: "Public Facilities",
-    description: "Public infrastructure and facilities across Seoul metropolitan area",
-    category: "인프라",
-    geometryType: "Point",
-    srid: 4326,
-    renderMode: "auto",
-    featureLimit: 2000,
-    minZoomForFeatures: 13,
-    tileEnabled: true,
-    tileMaxZoom: 14,
-    visible: false,
-    opacity: 1,
-    strokeColor: "#2563eb",
-    fillColor: "#3b82f680",
-    strokeWidth: 2,
-    pointRadius: 6,
-  });
-
-  const roadLayer = await storage.createLayer({
-    name: "Major Roads",
-    description: "Major road network and highways",
-    category: "교통",
-    geometryType: "LineString",
-    srid: 4326,
-    renderMode: "auto",
-    featureLimit: 1000,
-    minZoomForFeatures: 12,
-    tileEnabled: true,
-    tileMaxZoom: 14,
-    visible: false,
-    opacity: 0.8,
-    strokeColor: "#dc2626",
-    fillColor: "#ef444480",
-    strokeWidth: 3,
-    pointRadius: 4,
-  });
-
-  const zoneLayer = await storage.createLayer({
-    name: "Administrative Zones",
-    description: "Administrative district boundaries",
-    category: "행정",
-    geometryType: "Polygon",
-    srid: 4326,
-    renderMode: "auto",
-    featureLimit: 500,
-    minZoomForFeatures: 10,
-    tileEnabled: true,
-    tileMaxZoom: 14,
-    visible: true,
-    opacity: 0.5,
-    strokeColor: "#ca8a04",
-    fillColor: "#ca8a0440",
-    strokeWidth: 2,
-    pointRadius: 4,
-  });
-
-  const facilityTypes = ["병원", "학교", "도서관", "소방서", "경찰서", "공원", "주민센터", "우체국"];
-  const seoulCenter = { lng: 126.978, lat: 37.5665 };
-  const facilityFeatures = [];
-
-  for (let i = 0; i < 200; i++) {
-    const lng = seoulCenter.lng + (Math.random() - 0.5) * 0.3;
-    const lat = seoulCenter.lat + (Math.random() - 0.5) * 0.2;
-    const ftype = facilityTypes[Math.floor(Math.random() * facilityTypes.length)];
-    facilityFeatures.push({
-      layerId: facilityLayer.id,
-      geometry: { type: "Point", coordinates: [lng, lat] },
-      properties: {
-        name: `${ftype} ${i + 1}`,
-        type: ftype,
-        status: Math.random() > 0.2 ? "운영중" : "점검중",
-        capacity: Math.floor(Math.random() * 500) + 50,
-        address: `서울특별시 ${Math.floor(Math.random() * 25) + 1}구`,
-      },
-    });
-  }
-  await storage.createFeatures(facilityFeatures);
-
-  const roadFeatures = [];
-  const roadNames = ["강남대로", "테헤란로", "세종대로", "동호로", "올림픽대로", "한강대로"];
-  for (let i = 0; i < 30; i++) {
-    const startLng = seoulCenter.lng + (Math.random() - 0.5) * 0.25;
-    const startLat = seoulCenter.lat + (Math.random() - 0.5) * 0.15;
-    const points = [];
-    let curLng = startLng;
-    let curLat = startLat;
-    const numPoints = Math.floor(Math.random() * 8) + 3;
-    for (let j = 0; j < numPoints; j++) {
-      points.push([curLng, curLat]);
-      curLng += (Math.random() - 0.5) * 0.02;
-      curLat += (Math.random() - 0.5) * 0.01;
-    }
-    roadFeatures.push({
-      layerId: roadLayer.id,
-      geometry: { type: "LineString", coordinates: points },
-      properties: {
-        name: `${roadNames[i % roadNames.length]} ${Math.floor(i / roadNames.length) + 1}구간`,
-        lanes: Math.floor(Math.random() * 4) + 2,
-        speedLimit: [40, 50, 60, 80][Math.floor(Math.random() * 4)],
-        surface: Math.random() > 0.3 ? "아스팔트" : "콘크리트",
-      },
-    });
-  }
-  await storage.createFeatures(roadFeatures);
-
-  const districtNames = ["강남구", "종로구", "마포구", "용산구", "송파구"];
-  const zoneFeatures = [];
-  for (let i = 0; i < districtNames.length; i++) {
-    const cx = seoulCenter.lng + (i - 2) * 0.05;
-    const cy = seoulCenter.lat + ((i % 2) - 0.5) * 0.04;
-    const size = 0.02 + Math.random() * 0.01;
-    zoneFeatures.push({
-      layerId: zoneLayer.id,
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [cx - size, cy - size],
-          [cx + size, cy - size],
-          [cx + size * 0.8, cy],
-          [cx + size, cy + size],
-          [cx - size, cy + size],
-          [cx - size * 0.8, cy],
-          [cx - size, cy - size],
-        ]],
-      },
-      properties: {
-        name: districtNames[i],
-        population: Math.floor(Math.random() * 500000) + 200000,
-        area_km2: Math.floor(Math.random() * 30) + 10,
-        established: `19${Math.floor(Math.random() * 50) + 50}`,
-      },
-    });
-  }
-  await storage.createFeatures(zoneFeatures);
-
-  console.log("Seed complete: 200 facilities, 30 roads, 5 zones");
+  // 샘플 레이어 자동 생성 제거됨 — 불필요한 데모 데이터 재생성 방지
+  console.log("Seed complete.");
 }
+

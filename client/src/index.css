@@ -203,8 +203,8 @@
 }
 
 .ol-overviewmap:not(.ol-collapsed) {
-  width: 260px !important;
-  height: 180px !important;
+  width: 240px !important;
+  height: 165px !important;
 }
 
 .ol-overviewmap.ol-collapsed {
