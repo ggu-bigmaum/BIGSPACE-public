@@ -246,7 +246,7 @@ export async function registerRoutes(
   }).strict();
 
   // 드래그 순서 일괄 저장
-  app.patch("/api/layers/reorder", requireAuth, asyncHandler(async (req, res) => {
+  app.patch("/api/layers/reorder", requireAdmin, asyncHandler(async (req, res) => {
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.some(id => typeof id !== "string")) {
       return res.status(400).json({ message: "ids must be a string array" });
@@ -266,7 +266,7 @@ export async function registerRoutes(
     res.json(layer);
   }));
 
-  app.delete("/api/layers/:id", requireAuth, asyncHandler(async (req, res) => {
+  app.delete("/api/layers/:id", requireAdmin, asyncHandler(async (req, res) => {
     const ok = await storage.deleteLayer(req.params.id);
     if (!ok) return res.status(404).json({ message: "Layer not found" });
     writeAuditLog(req, "DELETE", "layer", req.params.id);
@@ -368,7 +368,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/layers/:id/features", requireAuth, async (req, res) => {
+  app.delete("/api/layers/:id/features", requireAdmin, async (req, res) => {
     const count = await storage.deleteFeaturesByLayer(req.params.id);
 
     // 피처 삭제 시 격자 캐시도 제거 (백그라운드)
@@ -386,7 +386,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: "bbox required" });
     }
     const parsedBbox = (bbox as string).split(",").map(Number);
-    if (parsedBbox.length !== 4) return res.status(400).json({ message: "Invalid bbox" });
+    if (parsedBbox.length !== 4 || parsedBbox.some(isNaN)) return res.status(400).json({ message: "Invalid bbox" });
     const limit = limitStr ? Math.min(parseInt(limitStr as string, 10), 5000) : 1000;
     const data = await storage.getFeaturesInBbox(req.params.id, parsedBbox, limit);
     res.json(data);
@@ -496,14 +496,14 @@ export async function registerRoutes(
   });
 
   // Basemap CRUD
-  app.get("/api/proxy/naver-tiles/:z/:x/:y", async (_req, res) => {
+  app.get("/api/proxy/naver-tiles/:z/:x/:y", requireAuth, async (_req, res) => {
     res.status(503).json({ message: "네이버 지도는 JavaScript SDK 인증이 필요합니다. NCP 콘솔에서 Web 서비스 URL 설정을 확인하세요." });
   });
 
   // VWorld WMS 프록시 (CORS 및 API 키 보호)
   app.get("/api/proxy/wms", requireAuth, (req, res) => {
     const params = new URLSearchParams(req.query as Record<string, string>);
-    params.set("KEY", process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "");
+    params.set("KEY", process.env.VWORLD_KEY || "");
     params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
     const path = `/req/wms?${params.toString()}`;
     const options: https.RequestOptions = {
@@ -533,7 +533,7 @@ export async function registerRoutes(
   // VWorld WFS 프록시 (CORS 및 API 키 보호)
   app.get("/api/proxy/wfs", requireAuth, (req, res) => {
     const params = new URLSearchParams(req.query as Record<string, string>);
-    params.set("KEY", process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "");
+    params.set("KEY", process.env.VWORLD_KEY || "");
     params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
     const path = `/req/wfs?${params.toString()}`;
     const options: https.RequestOptions = {
@@ -560,7 +560,7 @@ export async function registerRoutes(
   });
 
   let kakaoSdkCache: { data: string; fetchedAt: number } | null = null;
-  app.get("/api/proxy/kakao-sdk", async (_req, res) => {
+  app.get("/api/proxy/kakao-sdk", requireAuth, async (_req, res) => {
     try {
       if (kakaoSdkCache && Date.now() - kakaoSdkCache.fetchedAt < 24 * 60 * 60 * 1000) {
         res.setHeader("Content-Type", "text/javascript; charset=utf-8");
@@ -638,7 +638,7 @@ export async function registerRoutes(
     res.json(setting);
   });
 
-  app.put("/api/settings/:key", requireAuth, async (req, res) => {
+  app.put("/api/settings/:key", requireAdmin, async (req, res) => {
     try {
       if (req.body.value === undefined) {
         return res.status(400).json({ message: "value is required" });
@@ -899,7 +899,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin-boundaries/:level", requireAuth, async (req, res) => {
+  app.delete("/api/admin-boundaries/:level", requireAdmin, async (req, res) => {
     const count = await storage.deleteAdminBoundariesByLevel(req.params.level);
     res.json({ success: true, deleted: count });
   });

@@ -530,7 +530,7 @@ export class DatabaseStorage implements IStorage {
       centerLat: r.centerLat,
     }));
     for (let i = 0; i < cacheRows.length; i += 50) {
-      await db.insert(boundaryAggregateCache).values(cacheRows.slice(i, i + 50));
+      await db.insert(boundaryAggregateCache).values(cacheRows.slice(i, i + 50)).onConflictDoNothing();
     }
 
     return rows
