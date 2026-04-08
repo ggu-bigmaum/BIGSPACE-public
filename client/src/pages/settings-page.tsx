@@ -226,7 +226,7 @@ function SettingRow({ setting, onUpdate }: {
             step="0.001"
             value={val[0]}
             className="h-8 text-xs w-[110px]"
-            onChange={(e) => onUpdate(setting.key, [parseFloat(e.target.value), val[1]])}
+            onChange={(e) => { const n = parseFloat(e.target.value); if (!isNaN(n)) onUpdate(setting.key, [n, val[1]]); }}
             data-testid={`input-setting-lng-${setting.key}`}
           />
           <span className="text-[10px] text-muted-foreground">,</span>
@@ -235,7 +235,7 @@ function SettingRow({ setting, onUpdate }: {
             step="0.001"
             value={val[1]}
             className="h-8 text-xs w-[110px]"
-            onChange={(e) => onUpdate(setting.key, [val[0], parseFloat(e.target.value)])}
+            onChange={(e) => { const n = parseFloat(e.target.value); if (!isNaN(n)) onUpdate(setting.key, [val[0], n]); }}
             data-testid={`input-setting-lat-${setting.key}`}
           />
         </div>

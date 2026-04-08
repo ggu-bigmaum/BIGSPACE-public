@@ -107,8 +107,7 @@ export function useLayerRenderer(
     const zoom = view.getZoom() || 11;
     const tier = getZoomTier(layer, zoom);
 
-    // 새 fetch 시작 전 기존 데이터 즉시 제거 — tier 전환 시 겹침 방지
-    if (existing) existing.getSource()?.clear();
+    // tier 전환 시 겹침은 setLayer에서 source 교체로 해결 — fetch 전 clear 제거 (빈 화면 방지)
 
     // 격자 칸 크기를 ≈300m(≈0.0027°)로 고정, 뷰포트 폭에 맞춰 격자 수 계산
     const bboxWidthDeg = tr[0] - bl[0];
@@ -275,6 +274,8 @@ export function useLayerRenderer(
                   dataProjection: "EPSG:4326",
                   featureProjection: "EPSG:3857",
                 });
+                // bbox 전환 시 이전 features 제거 → 메모리 누수 방지
+                wfsSource.clear(true);
                 wfsSource.addFeatures(features);
                 success?.(features);
               })
@@ -332,8 +333,26 @@ export function useLayerRenderer(
       layerList.forEach(layer => { if (layer.visible) fetchAndRenderLayer(layer); });
     }, 300);
 
-    return () => { if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current); };
+    return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    };
   }, [layerList, mapView, fetchAndRenderLayer]);
+
+  // Cleanup: unmount 시 모든 OL 레이어 제거
+  useEffect(() => {
+    return () => {
+      const map = mapInstance.current;
+      if (!map) return;
+      vectorLayersRef.current.forEach(vl => { map.removeLayer(vl); vl.getSource()?.clear(); });
+      wmsLayersRef.current.forEach(tl => map.removeLayer(tl));
+      wfsLayersRef.current.forEach(vl => { map.removeLayer(vl); vl.getSource()?.clear(); });
+      mvtLayersRef.current.forEach(vl => map.removeLayer(vl));
+      vectorLayersRef.current.clear();
+      wmsLayersRef.current.clear();
+      wfsLayersRef.current.clear();
+      mvtLayersRef.current.clear();
+    };
+  }, []);
 
   // Auto-fit when new layer becomes visible
   useEffect(() => {
