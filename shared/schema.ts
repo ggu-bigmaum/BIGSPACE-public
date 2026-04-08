@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, real, jsonb, timestamp, index, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, real, jsonb, timestamp, index, foreignKey, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -165,7 +165,7 @@ export const administrativeBoundaries = pgTable("administrative_boundaries", {
   centerLat: real("center_lat"),
 }, (table) => [
   index("idx_admin_boundaries_level").on(table.level),
-  index("idx_admin_boundaries_code").on(table.code),
+  uniqueIndex("uq_admin_boundaries_code").on(table.code),
 ]);
 
 export const insertAdminBoundarySchema = createInsertSchema(administrativeBoundaries).omit({
@@ -188,6 +188,7 @@ export const boundaryAggregateCache = pgTable("boundary_aggregate_cache", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("idx_boundary_cache_layer_level").on(table.layerId, table.level),
+  uniqueIndex("uq_boundary_cache_layer_level_boundary").on(table.layerId, table.level, table.boundaryId),
   foreignKey({ columns: [table.layerId], foreignColumns: [layers.id] }).onDelete("cascade"),
   foreignKey({ columns: [table.boundaryId], foreignColumns: [administrativeBoundaries.id] }).onDelete("cascade"),
 ]);
@@ -207,7 +208,7 @@ export const gridAggregateCache = pgTable("grid_aggregate_cache", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("idx_grid_cache_layer_cell").on(table.layerId, table.cellSize),
-  index("idx_grid_cache_coords").on(table.layerId, table.cellSize, table.gx, table.gy),
+  uniqueIndex("uq_grid_cache_layer_cell_gx_gy").on(table.layerId, table.cellSize, table.gx, table.gy),
   foreignKey({ columns: [table.layerId], foreignColumns: [layers.id] }).onDelete("cascade"),
 ]);
 

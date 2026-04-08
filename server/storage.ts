@@ -139,13 +139,15 @@ export class DatabaseStorage implements IStorage {
 
   async createFeature(feature: InsertFeature): Promise<Feature> {
     const enriched = this.enrichFeatureCoords(feature);
-    const [created] = await db.insert(features).values(enriched).returning();
-    // geom 컬럼 동기화 (PostGIS)
-    await db.execute(sql`
-      UPDATE features
-      SET geom = ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)
-      WHERE id = ${created.id} AND geom IS NULL
-    `);
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx.insert(features).values(enriched).returning();
+      await tx.execute(sql`
+        UPDATE features
+        SET geom = ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)
+        WHERE id = ${row.id} AND geom IS NULL
+      `);
+      return row;
+    });
     await this.refreshLayerStats(feature.layerId);
     return created;
   }
@@ -155,19 +157,20 @@ export class DatabaseStorage implements IStorage {
     const enriched = featureList.map(f => this.enrichFeatureCoords(f));
     const batchSize = 500;
     const results: Feature[] = [];
-    for (let i = 0; i < enriched.length; i += batchSize) {
-      const batch = enriched.slice(i, i + batchSize);
-      const created = await db.insert(features).values(batch).returning();
-      results.push(...created);
-      // 배치 단위로 geom 컬럼 동기화
-      const ids = created.map(f => f.id);
-      await db.execute(sql`
-        UPDATE features
-        SET geom = ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)
-        WHERE id = ANY(ARRAY[${sql.join(ids.map(id => sql`${id}`), sql`, `)}]::text[])
-          AND geom IS NULL
-      `);
-    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < enriched.length; i += batchSize) {
+        const batch = enriched.slice(i, i + batchSize);
+        const created = await tx.insert(features).values(batch).returning();
+        results.push(...created);
+        const ids = created.map(f => f.id);
+        await tx.execute(sql`
+          UPDATE features
+          SET geom = ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)
+          WHERE id = ANY(ARRAY[${sql.join(ids.map(id => sql`${id}`), sql`, `)}]::text[])
+            AND geom IS NULL
+        `);
+      }
+    });
     if (featureList.length > 0) {
       await this.refreshLayerStats(featureList[0].layerId);
     }
@@ -377,8 +380,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async setDefaultBasemap(id: string): Promise<void> {
-    await db.update(basemaps).set({ isDefault: false });
-    await db.update(basemaps).set({ isDefault: true }).where(eq(basemaps.id, id));
+    await db.transaction(async (tx) => {
+      await tx.update(basemaps).set({ isDefault: false });
+      await tx.update(basemaps).set({ isDefault: true }).where(eq(basemaps.id, id));
+    });
   }
 
   async getSettings(category?: string): Promise<AppSetting[]> {
