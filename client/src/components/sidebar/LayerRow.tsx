@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, MoreHorizontal, Pencil, Trash2, Check } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -75,7 +75,7 @@ export function LayerRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative flex items-center h-8 cursor-pointer transition-colors select-none ${
+      className={`group relative flex items-center h-7 cursor-pointer transition-colors select-none ${
         isSelected ? "bg-accent" : "hover:bg-accent/50"
       } ${isDragging ? "z-50" : ""}`}
       onMouseEnter={() => setHovered(true)}
@@ -83,49 +83,33 @@ export function LayerRow({
       onClick={() => onSelect(isSelected ? null : layer.id)}
       data-testid={`button-select-layer-${layer.id}`}
     >
-      {/* Left color bar */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l"
-        style={{ backgroundColor: layer.strokeColor }}
-      />
-
-      {/* Mini toggle — 접힌 상태에서 숨김 */}
+      {/* Checkbox — 넓은 클릭 영역 */}
       <button
         type="button"
-        role="switch"
+        role="checkbox"
         aria-checked={layer.visible}
-        className={`relative ml-2 mr-1 shrink-0 h-3.5 w-6 rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-data-[collapsible=icon]:hidden ${
-          layer.visible ? "bg-primary" : "bg-muted-foreground/25"
+        className={`ml-1.5 mr-1.5 shrink-0 flex items-center justify-center w-4 h-4 rounded border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-data-[collapsible=icon]:hidden ${
+          layer.visible
+            ? "bg-primary border-primary text-primary-foreground"
+            : "border-muted-foreground/40 bg-transparent"
         }`}
         onClick={(e) => { e.stopPropagation(); onToggle(layer.id, !layer.visible); }}
         data-testid={`switch-toggle-visibility-${layer.id}`}
       >
-        <span
-          className={`absolute top-[2px] left-[2px] block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-150 ${
-            layer.visible ? "translate-x-2.5" : "translate-x-0"
-          }`}
-        />
+        {layer.visible && <Check className="w-3 h-3" strokeWidth={3} />}
       </button>
 
-      {/* Color dot — 접힌 상태에서도 표시, 가시성에 따라 투명도 변경 */}
-      <div
-        className={`w-3 h-3 rounded-full shrink-0 transition-opacity group-data-[collapsible=icon]:mx-auto ${
-          inactive ? "opacity-30" : "opacity-100"
-        }`}
-        style={{ backgroundColor: layer.fillColor }}
-      />
-
-      {/* Layer name — 접힌 상태에서 숨김 */}
+      {/* Layer name */}
       <span
-        className={`ml-1.5 text-[13px] truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden ${
-          inactive ? "text-muted-foreground opacity-50" : ""
+        className={`text-[12px] leading-tight truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden ${
+          inactive ? "text-muted-foreground/50" : "text-foreground"
         }`}
         data-testid={`text-layer-name-${layer.id}`}
       >
         {layer.name}
       </span>
 
-      {/* Right side: size label or more menu — 접힌 상태에서 숨김 */}
+      {/* Right side: size label or more menu */}
       <div className="flex items-center gap-0.5 shrink-0 mr-1 group-data-[collapsible=icon]:hidden">
         {hovered ? (
           <>
