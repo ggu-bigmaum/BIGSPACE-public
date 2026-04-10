@@ -80,8 +80,8 @@ export class DatabaseStorage implements IStorage {
   /** 유저 생성 + 첫 유저면 admin 승격 (트랜잭션으로 레이스컨디션 방지) */
   async createUserWithAutoAdmin(insertUser: InsertUser): Promise<User> {
     return db.transaction(async (tx) => {
-      // 트랜잭션 내에서 배타 잠금으로 유저 수 확인
-      const countResult = await tx.execute(sql`SELECT count(*)::int AS cnt FROM users FOR UPDATE`);
+      // 트랜잭션 내에서 배타 잠금으로 유저 수 확인 (FOR UPDATE는 집계함수 불가 → 서브쿼리 사용)
+      const countResult = await tx.execute(sql`SELECT count(*)::int AS cnt FROM (SELECT id FROM users FOR UPDATE) t`);
       const currentCount = (countResult.rows[0] as any)?.cnt ?? 0;
 
       const [user] = await tx.insert(users).values(insertUser).returning();

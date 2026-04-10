@@ -104,6 +104,7 @@ export async function registerRoutes(
         return res.status(201).json(safeUser);
       });
     } catch (e: any) {
+      console.error("[register error]", e);
       return res.status(500).json({ message: "서버 오류가 발생했습니다." });
     }
   });
