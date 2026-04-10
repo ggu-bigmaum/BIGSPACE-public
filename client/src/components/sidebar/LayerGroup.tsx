@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ChevronRight,
+  ChevronDown,
   Plus,
   Minus,
   Check,
@@ -38,9 +39,7 @@ const FALLBACK_ICONS = [Hash, Globe, MapIcon, Layers];
 interface LayerGroupProps {
   category: string;
   layers: Layer[];
-  selectedLayerId?: string | null;
   onToggle: (layerId: string, visible: boolean) => void;
-  onSelect: (layerId: string | null) => void;
   onEdit: (layer: Layer, e: React.MouseEvent) => void;
   onDelete: (layerId: string) => void;
 }
@@ -49,69 +48,60 @@ interface LayerGroupProps {
 function SubGroup({
   subCategory,
   layers,
-  selectedLayerId,
   onToggle,
-  onSelect,
   onEdit,
   onDelete,
 }: {
   subCategory: string;
   layers: Layer[];
-  selectedLayerId?: string | null;
   onToggle: (layerId: string, visible: boolean) => void;
-  onSelect: (layerId: string | null) => void;
   onEdit: (layer: Layer, e: React.MouseEvent) => void;
   onDelete: (layerId: string) => void;
 }) {
   const anyVisible = layers.some((l) => l.visible);
-  const [open, setOpen] = useState(anyVisible);
   const allVisible = layers.every((l) => l.visible);
+  const [open, setOpen] = useState(anyVisible);
 
   const handleBatchToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     const newVisible = !allVisible;
-    layers.forEach((l) => {
+    for (const l of layers) {
       if (l.visible !== newVisible) onToggle(l.id, newVisible);
-    });
+    }
   };
 
   return (
     <div>
-      <button
-        type="button"
-        className="flex items-center w-full gap-1 pl-5 pr-2 py-[3px] text-left hover:bg-accent/30 transition-colors group-data-[collapsible=icon]:hidden"
+      <div
+        className="flex items-center w-full gap-1.5 pl-6 pr-2 py-1 text-left hover:bg-accent/30 transition-colors group-data-[collapsible=icon]:hidden cursor-pointer"
         onClick={() => setOpen((prev) => !prev)}
       >
-        {/* +/- 아이콘 */}
-        <span className="flex items-center justify-center w-3.5 h-3.5 shrink-0 text-muted-foreground/70">
-          {open ? <Minus className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
-        </span>
-
-        {/* 서브카테고리 체크박스 (전체 토글) */}
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={allVisible}
-          className={`shrink-0 flex items-center justify-center w-3.5 h-3.5 rounded border transition-colors duration-150 ${
+        {/* Checkbox */}
+        <div
+          className={`shrink-0 flex items-center justify-center w-4 h-4 rounded border-[1.5px] transition-colors duration-150 cursor-pointer ${
             allVisible
               ? "bg-primary border-primary text-primary-foreground"
               : anyVisible
-                ? "border-primary bg-primary/30 text-primary-foreground"
+                ? "border-primary/50 bg-primary/20 text-primary-foreground"
                 : "border-muted-foreground/40 bg-transparent"
           }`}
           onClick={handleBatchToggle}
         >
-          {allVisible && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
-          {!allVisible && anyVisible && <Minus className="w-2.5 h-2.5" strokeWidth={3} />}
-        </button>
+          {(allVisible || anyVisible) && <Check className="w-3 h-3" strokeWidth={3} />}
+        </div>
 
-        <span className="text-[11px] text-muted-foreground/80 truncate ml-0.5">
+        {/* +/- 아이콘 */}
+        <span className="flex items-center justify-center w-3.5 h-3.5 shrink-0 text-muted-foreground/60">
+          {open ? <Minus className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
+        </span>
+
+        <span className="text-sm text-muted-foreground truncate font-medium">
           {subCategory}
         </span>
-        <span className="text-[9px] text-muted-foreground/50 ml-auto shrink-0">
+        <span className="text-sm text-muted-foreground/50 ml-auto shrink-0">
           {layers.length}
         </span>
-      </button>
+      </div>
 
       {open && (
         <div className="ml-4">
@@ -119,9 +109,7 @@ function SubGroup({
             <LayerRow
               key={layer.id}
               layer={layer}
-              isSelected={selectedLayerId === layer.id}
               onToggle={onToggle}
-              onSelect={onSelect}
               onEdit={onEdit}
               onDelete={onDelete}
             />
@@ -135,9 +123,7 @@ function SubGroup({
 export function LayerGroup({
   category,
   layers,
-  selectedLayerId,
   onToggle,
-  onSelect,
   onEdit,
   onDelete,
 }: LayerGroupProps) {
@@ -147,18 +133,6 @@ export function LayerGroup({
   const Icon =
     ICON_MAP[category] ||
     FALLBACK_ICONS[category.length % FALLBACK_ICONS.length];
-
-  const allVisible = layers.every((l) => l.visible);
-
-  const handleBatchToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newVisible = !allVisible;
-    layers.forEach((l) => {
-      if (l.visible !== newVisible) {
-        onToggle(l.id, newVisible);
-      }
-    });
-  };
 
   // Split layers into sub-groups and ungrouped
   const subGroups = new Map<string, Layer[]>();
@@ -178,55 +152,34 @@ export function LayerGroup({
 
   return (
     <div data-testid={`category-label-${category}`}>
-      {/* Category header */}
+      {/* Category header — 클릭 = 접기/펼치기만 */}
       <button
         type="button"
-        className="flex items-center w-full gap-1.5 px-2 py-1 text-left hover:bg-accent/40 transition-colors group-data-[collapsible=icon]:hidden"
+        className="flex items-center w-full gap-1.5 px-2 py-1.5 text-left hover:bg-accent/40 transition-colors group-data-[collapsible=icon]:hidden"
         onClick={() => setOpen((prev) => !prev)}
       >
-        <ChevronRight
-          className={`w-3 h-3 text-muted-foreground transition-transform shrink-0 ${
-            open ? "rotate-90" : ""
-          }`}
-        />
+        {open
+          ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+        }
         <Icon className="w-3.5 h-3.5 text-primary shrink-0" />
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+        <span className="text-sm font-semibold text-foreground/70 tracking-wide truncate">
           {category}
         </span>
-        <span className="text-[9px] text-muted-foreground/60 ml-auto shrink-0">
+        <span className="text-sm text-muted-foreground/60 ml-auto shrink-0">
           {layers.length}
         </span>
-
-        {/* Category batch toggle checkbox */}
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={allVisible}
-          className={`flex items-center justify-center w-4 h-4 rounded border shrink-0 transition-colors ${
-            allVisible
-              ? "bg-primary border-primary text-primary-foreground"
-              : anyVisible
-                ? "border-primary bg-primary/30 text-primary-foreground"
-                : "border-muted-foreground/40 bg-transparent"
-          }`}
-          onClick={handleBatchToggle}
-        >
-          {allVisible && <Check className="w-3 h-3" strokeWidth={3} />}
-          {!allVisible && anyVisible && <Minus className="w-3 h-3" strokeWidth={3} />}
-        </button>
       </button>
 
       {/* Layer rows */}
       {open && (
-        <div>
+        <div className="pb-1">
           {/* Ungrouped layers first */}
           {ungrouped.map((layer) => (
             <LayerRow
               key={layer.id}
               layer={layer}
-              isSelected={selectedLayerId === layer.id}
               onToggle={onToggle}
-              onSelect={onSelect}
               onEdit={onEdit}
               onDelete={onDelete}
             />
@@ -238,9 +191,7 @@ export function LayerGroup({
               key={sub}
               subCategory={sub}
               layers={subLayers}
-              selectedLayerId={selectedLayerId}
               onToggle={onToggle}
-              onSelect={onSelect}
               onEdit={onEdit}
               onDelete={onDelete}
             />

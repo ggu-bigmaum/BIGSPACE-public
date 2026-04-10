@@ -600,9 +600,7 @@ export function AppSidebar({
                       <LayerGroup
                         category={cat}
                         layers={grouped[cat]}
-                        selectedLayerId={selectedLayerId}
                         onToggle={handleToggle}
-                        onSelect={handleSelect}
                         onEdit={handleEditOpen}
                         onDelete={handleDelete}
                       />

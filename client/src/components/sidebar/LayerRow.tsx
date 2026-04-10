@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { GripVertical, MoreHorizontal, Pencil, Trash2, Check } from "lucide-react";
+import { GripVertical, Pencil, Trash2, Check } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,22 +35,17 @@ function getSizeLabel(layer: Layer): string {
 
 interface LayerRowProps {
   layer: Layer;
-  isSelected: boolean;
   onToggle: (layerId: string, visible: boolean) => void;
-  onSelect: (layerId: string | null) => void;
   onEdit: (layer: Layer, e: React.MouseEvent) => void;
   onDelete: (layerId: string) => void;
 }
 
 export function LayerRow({
   layer,
-  isSelected,
   onToggle,
-  onSelect,
   onEdit,
   onDelete,
 }: LayerRowProps) {
-  const [hovered, setHovered] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const {
@@ -69,99 +64,84 @@ export function LayerRow({
   };
 
   const sizeLabel = getSizeLabel(layer);
-  const inactive = !layer.visible;
+const active = layer.visible;
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`group relative flex items-center h-7 cursor-pointer transition-colors select-none ${
-        isSelected ? "bg-accent" : "hover:bg-accent/50"
-      } ${isDragging ? "z-50" : ""}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={() => onSelect(isSelected ? null : layer.id)}
-      data-testid={`button-select-layer-${layer.id}`}
-    >
-      {/* Checkbox — 넓은 클릭 영역 */}
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={layer.visible}
-        className={`ml-1.5 mr-1.5 shrink-0 flex items-center justify-center w-4 h-4 rounded border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-data-[collapsible=icon]:hidden ${
-          layer.visible
-            ? "bg-primary border-primary text-primary-foreground"
-            : "border-muted-foreground/40 bg-transparent"
-        }`}
-        onClick={(e) => { e.stopPropagation(); onToggle(layer.id, !layer.visible); }}
-        data-testid={`switch-toggle-visibility-${layer.id}`}
-      >
-        {layer.visible && <Check className="w-3 h-3" strokeWidth={3} />}
-      </button>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setNodeRef}
+          style={style}
+          className={`group/row relative flex items-center h-8 cursor-pointer transition-colors select-none rounded-md mx-1 ${
+            active
+              ? "bg-primary/[0.08] hover:bg-primary/[0.14]"
+              : "hover:bg-accent/40"
+          } ${isDragging ? "z-50" : ""}`}
+          onClick={() => onToggle(layer.id, !layer.visible)}
+          data-testid={`button-toggle-layer-${layer.id}`}
+        >
+          {/* Drag handle — hover 시에만 */}
+          <div
+            className="flex items-center justify-center w-5 h-full cursor-grab shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground/40 hover:text-muted-foreground group-data-[collapsible=icon]:hidden"
+            onClick={(e) => e.stopPropagation()}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="w-3 h-3" />
+          </div>
 
-      {/* Layer name */}
-      <span
-        className={`text-[12px] leading-tight truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden ${
-          inactive ? "text-muted-foreground/50" : "text-foreground"
-        }`}
-        data-testid={`text-layer-name-${layer.id}`}
-      >
-        {layer.name}
-      </span>
+          {/* Checkbox 16px */}
+          <div
+            className={`shrink-0 flex items-center justify-center w-4 h-4 rounded border-[1.5px] transition-colors duration-150 group-data-[collapsible=icon]:hidden ${
+              active
+                ? "bg-primary border-primary text-primary-foreground"
+                : "border-muted-foreground/40 bg-transparent"
+            }`}
+          >
+            {active && <Check className="w-3 h-3" strokeWidth={3} />}
+          </div>
 
-      {/* Right side: size label or more menu */}
-      <div className="flex items-center gap-0.5 shrink-0 mr-1 group-data-[collapsible=icon]:hidden">
-        {hovered ? (
-          <>
-            {/* Drag handle */}
-            <div
-              className="flex items-center justify-center w-5 h-5 cursor-grab text-muted-foreground/50 hover:text-muted-foreground"
-              {...attributes}
-              {...listeners}
-            >
-              <GripVertical className="w-3 h-3" />
-            </div>
-
-            {/* More menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex items-center justify-center w-5 h-5 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="w-3.5 h-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-32">
-                <DropdownMenuItem
-                  onClick={(e) => { e.stopPropagation(); onEdit(layer, e as any); }}
-                  data-testid={`button-edit-layer-${layer.id}`}
-                >
-                  <Pencil className="w-3.5 h-3.5 mr-2" />
-                  편집
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }}
-                  data-testid={`button-delete-layer-inline-${layer.id}`}
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-2" />
-                  삭제
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        ) : (
+          {/* Layer name */}
           <span
-            className={`text-[9px] text-muted-foreground tabular-nums ${
-              inactive ? "opacity-50" : ""
+            className={`text-sm leading-tight truncate flex-1 min-w-0 ml-2 group-data-[collapsible=icon]:hidden ${
+              active ? "text-foreground/80 font-medium" : "text-muted-foreground/50"
+            }`}
+            data-testid={`text-layer-name-${layer.id}`}
+          >
+            {layer.name}
+          </span>
+
+          {/* Size label */}
+          <span
+            className={`text-sm tabular-nums mr-2 shrink-0 group-data-[collapsible=icon]:hidden ${
+              active ? "text-muted-foreground/70" : "text-muted-foreground/40"
             }`}
             data-testid={`text-layer-size-${layer.id}`}
           >
             {sizeLabel}
           </span>
-        )}
-      </div>
+
+        </div>
+      </ContextMenuTrigger>
+
+      {/* 우클릭 컨텍스트 메뉴 */}
+      <ContextMenuContent className="w-36">
+        <ContextMenuItem
+          onClick={(e) => onEdit(layer, e as any)}
+          data-testid={`button-edit-layer-${layer.id}`}
+        >
+          <Pencil className="w-3.5 h-3.5 mr-2" />
+          편집
+        </ContextMenuItem>
+        <ContextMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={() => setDeleteOpen(true)}
+          data-testid={`button-delete-layer-inline-${layer.id}`}
+        >
+          <Trash2 className="w-3.5 h-3.5 mr-2" />
+          삭제
+        </ContextMenuItem>
+      </ContextMenuContent>
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -174,15 +154,10 @@ export function LayerRow({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
-              취소
-            </AlertDialogCancel>
+            <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(layer.id);
-              }}
+              onClick={() => onDelete(layer.id)}
               data-testid={`button-confirm-delete-inline-${layer.id}`}
             >
               삭제
@@ -190,6 +165,6 @@ export function LayerRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </ContextMenu>
   );
 }

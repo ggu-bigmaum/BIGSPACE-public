@@ -6,9 +6,7 @@ import { LayerRow } from "./LayerRow";
 interface LayerListProps {
   layers: Layer[];
   height: number;
-  selectedLayerId?: string | null;
   onToggle: (layerId: string, visible: boolean) => void;
-  onSelect: (layerId: string | null) => void;
   onEdit: (layer: Layer, e: React.MouseEvent) => void;
   onDelete: (layerId: string) => void;
 }
@@ -19,9 +17,7 @@ const VIRTUAL_THRESHOLD = 50;
 export function LayerList({
   layers,
   height,
-  selectedLayerId,
   onToggle,
-  onSelect,
   onEdit,
   onDelete,
 }: LayerListProps) {
@@ -33,9 +29,7 @@ export function LayerList({
           <LayerRow
             key={layer.id}
             layer={layer}
-            isSelected={selectedLayerId === layer.id}
             onToggle={onToggle}
-            onSelect={onSelect}
             onEdit={onEdit}
             onDelete={onDelete}
           />
@@ -53,13 +47,11 @@ export function LayerList({
       width="100%"
       overscanCount={5}
     >
-      {({ index, style }) => (
+      {({ index, style }: { index: number; style: React.CSSProperties }) => (
         <div style={style}>
           <LayerRow
             layer={layers[index]}
-            isSelected={selectedLayerId === layers[index].id}
             onToggle={onToggle}
-            onSelect={onSelect}
             onEdit={onEdit}
             onDelete={onDelete}
           />

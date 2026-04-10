@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { layers, basemaps } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { fetchVWorldMinZoom } from "./wmsUtils";
 
 async function upsertBasemaps() {
   console.log("Upserting basemaps...");
@@ -272,8 +273,24 @@ async function upsertVWorldLayers() {
     },
   ];
 
+  const apiKey = process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "";
+
   for (const vl of vworldLayers) {
-    if (existingNames.has(vl.name)) continue;
+    const detectedZoom = await fetchVWorldMinZoom(vl.wmsLayers, apiKey);
+    if (detectedZoom !== null) {
+      console.log(`VWorld ${vl.name}(${vl.wmsLayers}) minZoom 자동감지: z${detectedZoom}`);
+    }
+
+    // 기존 레이어면 minZoomForFeatures만 업데이트
+    const existing = existingLayers.find(l => l.name === vl.name);
+    if (existing) {
+      if (detectedZoom !== null && existing.minZoomForFeatures !== detectedZoom) {
+        await storage.updateLayer(existing.id, { minZoomForFeatures: detectedZoom });
+        console.log(`VWorld ${vl.name} minZoom 업데이트: z${detectedZoom}`);
+      }
+      continue;
+    }
+
     await storage.createLayer({
       name: vl.name,
       description: vl.description,
@@ -283,7 +300,7 @@ async function upsertVWorldLayers() {
       srid: 4326,
       renderMode: "feature",
       featureLimit: 5000,
-      minZoomForFeatures: 11,
+      minZoomForFeatures: detectedZoom ?? 12,
       minZoomForClusters: 0,
       tileEnabled: false,
       tileMaxZoom: 14,

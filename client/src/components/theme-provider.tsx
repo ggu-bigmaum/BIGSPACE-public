@@ -27,11 +27,11 @@ function resolveTheme(theme: Theme): ResolvedTheme {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === "undefined") return "light";
-    return (localStorage.getItem("theme") as Theme) || "dark";
+    return (localStorage.getItem("theme") as Theme) || "light";
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
-    resolveTheme(typeof window === "undefined" ? "light" : (localStorage.getItem("theme") as Theme) || "dark")
+    resolveTheme(typeof window === "undefined" ? "light" : (localStorage.getItem("theme") as Theme) || "light")
   );
 
   useEffect(() => {
