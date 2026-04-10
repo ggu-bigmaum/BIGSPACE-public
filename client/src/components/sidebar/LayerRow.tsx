@@ -48,6 +48,8 @@ export function LayerRow({
 }: LayerRowProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  const isRemote = !!(layer.wmsUrl || layer.wfsUrl);
+
   const {
     attributes,
     listeners,
@@ -64,20 +66,22 @@ export function LayerRow({
   };
 
   const sizeLabel = getSizeLabel(layer);
-const active = layer.visible;
+  const active = layer.visible;
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div
+        <button
+          type="button"
           ref={setNodeRef}
           style={style}
-          className={`group/row relative flex items-center h-8 cursor-pointer transition-colors select-none rounded-md mx-1 ${
+          className={`group/row relative flex items-center w-full h-8 cursor-pointer transition-colors select-none rounded-md mx-1 text-left ${
             active
               ? "bg-primary/[0.08] hover:bg-primary/[0.14]"
               : "hover:bg-accent/40"
           } ${isDragging ? "z-50" : ""}`}
           onClick={() => onToggle(layer.id, !layer.visible)}
+          title={isRemote ? "WMS/WFS 레이어는 확대하면 표시됩니다" : undefined}
           data-testid={`button-toggle-layer-${layer.id}`}
         >
           {/* Drag handle — hover 시에만 */}
@@ -121,7 +125,7 @@ const active = layer.visible;
             {sizeLabel}
           </span>
 
-        </div>
+        </button>
       </ContextMenuTrigger>
 
       {/* 우클릭 컨텍스트 메뉴 */}

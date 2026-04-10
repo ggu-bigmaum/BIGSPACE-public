@@ -42,6 +42,19 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { LAYER_PALETTE } from "@/lib/colorPalette";
 
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { LayerGroup } from "@/components/sidebar/LayerGroup";
 import { LayerSearch } from "@/components/sidebar/LayerSearch";
 import { SidebarFooterContent } from "@/components/sidebar/SidebarFooter";
@@ -201,6 +214,7 @@ function LayerEditSheet({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
+                        aria-label={color.label}
                         onClick={() => instantUpdate({ strokeColor: color.strokeColor, fillColor: color.fillColor })}
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                           merged.strokeColor === color.strokeColor
@@ -406,7 +420,9 @@ export function AppSidebar({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
       await apiRequest("PATCH", `/api/layers/${id}`, updates);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // reorder가 진행 중이면 완료될 때까지 대기 후 invalidate
+      if (reorderPromiseRef.current) await reorderPromiseRef.current.catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["/api/layers"] });
     },
   });
@@ -425,14 +441,60 @@ export function AppSidebar({
     },
   });
 
+  // ── Drag reorder ───────────────────────────────────────────────
+
+  const reorderPromiseRef = useRef<Promise<unknown> | null>(null);
+
+  const reorderMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const p = apiRequest("PATCH", "/api/layers/reorder", { ids });
+      reorderPromiseRef.current = p;
+      await p;
+      reorderPromiseRef.current = null;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/layers"] });
+    },
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id || !layersData) return;
+
+      const oldIndex = layersData.findIndex((l) => l.id === active.id);
+      const newIndex = layersData.findIndex((l) => l.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(layersData, oldIndex, newIndex);
+      // Optimistic: update query cache
+      queryClient.setQueryData(["/api/layers"], reordered);
+      // Persist
+      reorderMutation.mutate(reordered.map((l) => l.id));
+    },
+    [layersData, reorderMutation],
+  );
+
   // ── Callbacks for sub-components ───────────────────────────────
 
   const handleToggle = useCallback(
     (layerId: string, visible: boolean) => {
-      updateMutation.mutate({ id: layerId, updates: { visible } });
+      // 낙관적 업데이트만 — invalidateQueries 안 탐 (순서 보존)
+      queryClient.setQueryData(["/api/layers"], (old: Layer[] | undefined) =>
+        old?.map((l) => (l.id === layerId ? { ...l, visible } : l)),
+      );
+      // fire-and-forget: 서버에 저장만, refetch 안 함
+      apiRequest("PATCH", `/api/layers/${layerId}`, { visible }).catch(() => {
+        // 실패 시 롤백
+        queryClient.invalidateQueries({ queryKey: ["/api/layers"] });
+      });
       onLayerToggle?.(layerId, visible);
     },
-    [updateMutation, onLayerToggle],
+    [onLayerToggle],
   );
 
   const handleSelect = useCallback(
@@ -477,6 +539,10 @@ export function AppSidebar({
   }, [layersData, searchQuery]);
 
   const categories = Object.keys(grouped);
+  const allLayerIds = useMemo(
+    () => (layersData ?? []).map((l) => l.id),
+    [layersData],
+  );
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -584,28 +650,30 @@ export function AppSidebar({
             </SidebarGroupLabel>
 
             <SidebarGroupContent>
-              <SidebarMenu>
-                {isLoading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <SidebarMenuItem key={i}>
-                      <div className="px-2 py-2">
-                        <Skeleton className="h-8 w-full" />
-                      </div>
-                    </SidebarMenuItem>
-                  ))
-                ) : categories.length > 0 ? (
-                  categories.map((cat, idx) => (
-                    <SidebarMenuItem key={cat}>
-                      {idx > 0 && <Separator className="my-1" />}
-                      <LayerGroup
-                        category={cat}
-                        layers={grouped[cat]}
-                        onToggle={handleToggle}
-                        onEdit={handleEditOpen}
-                        onDelete={handleDelete}
-                      />
-                    </SidebarMenuItem>
-                  ))
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={allLayerIds} strategy={verticalListSortingStrategy}>
+                  <SidebarMenu>
+                    {isLoading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <SidebarMenuItem key={i}>
+                          <div className="px-2 py-2">
+                            <Skeleton className="h-8 w-full" />
+                          </div>
+                        </SidebarMenuItem>
+                      ))
+                    ) : categories.length > 0 ? (
+                      categories.map((cat, idx) => (
+                        <SidebarMenuItem key={cat}>
+                          {idx > 0 && <Separator className="my-1" />}
+                          <LayerGroup
+                            category={cat}
+                            layers={grouped[cat]}
+                            onToggle={handleToggle}
+                            onEdit={handleEditOpen}
+                            onDelete={handleDelete}
+                          />
+                        </SidebarMenuItem>
+                      ))
                 ) : (
                   <SidebarMenuItem>
                     <div className="px-3 py-4 text-center">
@@ -631,7 +699,9 @@ export function AppSidebar({
                     </div>
                   </SidebarMenuItem>
                 )}
-              </SidebarMenu>
+                  </SidebarMenu>
+                </SortableContext>
+              </DndContext>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>

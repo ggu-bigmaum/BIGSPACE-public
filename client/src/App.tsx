@@ -21,6 +21,7 @@ function MapLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [radiusOpen, setRadiusOpen] = useState(false);
+  const [mapScale, setMapScale] = useState(0);
 
   const style = {
     "--sidebar-width": "19rem",
@@ -46,6 +47,7 @@ function MapLayout() {
             onAnalysisClose={() => setAnalysisOpen(false)}
             radiusOpen={radiusOpen}
             onRadiusClose={() => setRadiusOpen(false)}
+            onScaleChange={setMapScale}
           />
         </main>
       </div>

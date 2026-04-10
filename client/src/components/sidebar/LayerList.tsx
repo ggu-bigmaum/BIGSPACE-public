@@ -1,5 +1,5 @@
-import ReactWindow from "react-window";
-const { FixedSizeList: List } = ReactWindow as any;
+// @ts-expect-error react-window types vary by module resolution
+import { FixedSizeList as List } from "react-window";
 import type { Layer } from "@shared/schema";
 import { LayerRow } from "./LayerRow";
 
