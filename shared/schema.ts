@@ -67,7 +67,6 @@ export const layers = pgTable("layers", {
   wmsLayers: text("wms_layers"),
   wfsUrl: text("wfs_url"),
   wfsLayers: text("wfs_layers"),
-  maxScaleDenominator: real("max_scale_denominator"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
