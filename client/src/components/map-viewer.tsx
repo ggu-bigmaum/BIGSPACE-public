@@ -25,8 +25,8 @@ interface MapViewerProps {
   layers: Layer[];
   selectedLayerId: string | null;
   activeTool: string;
-  mapView: { zoom: number; bbox: [number, number, number, number] };
-  onViewChange: (view: { zoom: number; bbox: [number, number, number, number] }) => void;
+  mapView: { zoom: number; scale: number; bbox: [number, number, number, number] };
+  onViewChange: (view: { zoom: number; scale: number; bbox: [number, number, number, number] }) => void;
   onMapClick?: (lng: number, lat: number) => void;
   onBoxSelect?: (bbox: [number, number, number, number]) => void;
   radiusCenter?: { lng: number; lat: number } | null;
@@ -197,7 +197,13 @@ export function MapViewer({
       <div ref={naverMapDivRef} className="absolute inset-0 z-[0]" style={{ display: "none", pointerEvents: "none" }} data-testid="naver-map-container" />
       <div ref={mapRef} className="absolute inset-0 z-[1]" data-testid="map-container" />
 
-      {layerList.some(l => l.visible && (l.wmsUrl || l.wfsUrl) && mapView.zoom < (l.minZoomForFeatures || 11)) && (
+      {layerList.some(l => {
+        if (!l.visible || (!l.wmsUrl && !l.wfsUrl)) return false;
+        // maxScaleDenominator: GetCapabilities 자동감지값 (서버 재시작 후 채워짐)
+        // 없으면 minZoomForFeatures → 축적 변환 (559082264 / 2^z)
+        const maxScale = l.maxScaleDenominator ?? (559082264 / Math.pow(2, l.minZoomForFeatures || 11));
+        return mapView.scale > maxScale;
+      }) && (
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
           <div className="bg-background/90 backdrop-blur-sm text-muted-foreground border border-border rounded-md px-3 py-1.5 shadow-md flex items-center gap-1.5 text-[11px]">
             <ZoomIn className="w-3.5 h-3.5 flex-shrink-0" />
@@ -225,16 +231,18 @@ export function MapViewer({
         <Button
           size="icon" variant="ghost"
           onClick={() => { setMapToolMode("select"); selectionLayerRef.current?.getSource()?.clear(); onBoxSelect?.(undefined as any); }}
-          className={`w-8 h-8 rounded-lg shadow-sm ${mapToolMode === "select" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border border-border hover:bg-accent"}`}
+          className={`w-11 h-11 rounded-lg shadow-sm ${mapToolMode === "select" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border border-border hover:bg-accent"}`}
           data-testid="button-tool-select" title="이동/선택"
+          aria-label="이동/선택 도구"
         >
           <MousePointer className="w-4 h-4" />
         </Button>
         <Button
           size="icon" variant="ghost"
           onClick={() => setMapToolMode("boxSelect")}
-          className={`w-8 h-8 rounded-lg shadow-sm ${mapToolMode === "boxSelect" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border border-border hover:bg-accent"}`}
+          className={`w-11 h-11 rounded-lg shadow-sm ${mapToolMode === "boxSelect" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border border-border hover:bg-accent"}`}
           data-testid="button-tool-box-select" title="영역 선택"
+          aria-label="영역 선택 도구"
         >
           <BoxSelect className="w-4 h-4" />
         </Button>

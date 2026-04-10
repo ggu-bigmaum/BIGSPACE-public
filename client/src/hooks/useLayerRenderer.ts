@@ -14,13 +14,14 @@ import { Point } from "ol/geom";
 import type OlMap from "ol/Map";
 import type { Layer } from "@shared/schema";
 import { getLayerStyle, getClusterStyle, getBoundaryCircleStyle } from "@/lib/mapStyles";
+import { SCALE_SIDO, SCALE_SIGUNGU, SCALE_EUPMYEONDONG, SCALE_CLUSTER } from "@/lib/mapUtils";
 
 const geojsonFormat = new GeoJSON();
 
 export function useLayerRenderer(
   mapInstance: React.RefObject<OlMap | null>,
   layerList: Layer[],
-  mapView: { zoom: number; bbox: [number, number, number, number] }
+  mapView: { zoom: number; scale: number; bbox: [number, number, number, number] }
 ) {
   const vectorLayersRef = useRef<Map<string, VectorLayer<VectorSource>>>(new Map());
   const wmsLayersRef = useRef<Map<string, TileLayer>>(new Map());
@@ -30,17 +31,19 @@ export function useLayerRenderer(
   const prevVisibleIdsRef = useRef<Set<string>>(new Set());
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const getZoomTier = useCallback((layer: Layer, zoom: number): "sido" | "sigungu" | "eupmyeondong" | "cluster" | "feature" => {
+  const getZoomTier = useCallback((layer: Layer, scale: number): "sido" | "sigungu" | "eupmyeondong" | "cluster" | "feature" => {
     if (layer.renderMode === "feature") return "feature";
-    const z = Math.round(zoom);
     if (layer.geometryType === "Point" && layer.featureCount > 100) {
-      if (z <= 11) return "sido";
-      if (z <= 13) return "sigungu";
-      if (z <= 15) return "eupmyeondong";
-      if (z <= 17) return "cluster";
+      if (scale > SCALE_SIDO)          return "sido";
+      if (scale > SCALE_SIGUNGU)       return "sigungu";
+      if (scale > SCALE_EUPMYEONDONG)  return "eupmyeondong";
+      if (scale > SCALE_CLUSTER)       return "cluster";
       return "feature";
     }
-    if (layer.featureCount > 100 && z < layer.minZoomForFeatures) return "cluster";
+    if (layer.featureCount > 100 && layer.minZoomForFeatures > 0) {
+      const clusterMaxScale = 559082264 / Math.pow(2, layer.minZoomForFeatures);
+      if (scale > clusterMaxScale) return "cluster";
+    }
     return "feature";
   }, []);
 
@@ -104,8 +107,9 @@ export function useLayerRenderer(
     const bl = toLonLat([extent[0], extent[1]]);
     const tr = toLonLat([extent[2], extent[3]]);
     const bbox = `${bl[0]},${bl[1]},${tr[0]},${tr[1]}`;
-    const zoom = view.getZoom() || 11;
-    const tier = getZoomTier(layer, zoom);
+    const resolution = view.getResolution() || 0;
+    const scale = resolution / 0.00028;
+    const tier = getZoomTier(layer, scale);
 
     // tier 전환 시 겹침은 setLayer에서 source 교체로 해결 — fetch 전 clear 제거 (빈 화면 방지)
 
@@ -167,7 +171,7 @@ export function useLayerRenderer(
         setLayer(source, true); // feature-level 스타일 → 레이어 style 초기화
 
       } else {
-        const res = await fetch(`/api/layers/${layer.id}/features?bbox=${bbox}&limit=${layer.featureLimit}&zoom=${Math.round(zoom)}`);
+        const res = await fetch(`/api/layers/${layer.id}/features?bbox=${bbox}&limit=${layer.featureLimit}`);
         if (layerRequestVersionRef.current.get(layer.id) !== version) return;
         const geojson = await res.json();
 

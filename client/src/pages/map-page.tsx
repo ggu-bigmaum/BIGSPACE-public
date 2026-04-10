@@ -15,6 +15,7 @@ interface MapPageProps {
   onAnalysisClose?: () => void;
   radiusOpen?: boolean;
   onRadiusClose?: () => void;
+  onScaleChange?: (scale: number) => void;
 }
 
 export default function MapPage({
@@ -23,13 +24,20 @@ export default function MapPage({
   onAnalysisClose,
   radiusOpen = false,
   onRadiusClose,
+  onScaleChange,
 }: MapPageProps) {
   const activeTool = radiusOpen ? "radius" : "select";
   const { toast } = useToast();
-  const [mapView, setMapView] = useState<{ zoom: number; bbox: [number, number, number, number] }>({
+  const [mapView, setMapView] = useState<{ zoom: number; scale: number; bbox: [number, number, number, number] }>({
     zoom: 11,
+    scale: 0,
     bbox: [126.5, 37.2, 127.5, 37.9],
   });
+
+  const handleViewChange = useCallback((view: typeof mapView) => {
+    setMapView(view);
+    onScaleChange?.(view.scale);
+  }, [onScaleChange]);
   const [selectionBbox, setSelectionBbox] = useState<[number, number, number, number] | null>(null);
 
   const [radiusCenter, setRadiusCenter] = useState<{ lng: number; lat: number } | null>(null);
@@ -62,7 +70,7 @@ export default function MapPage({
     setIsSearching(true);
     try {
       const res = await fetch(
-        `/api/spatial/radius?lng=${radiusCenter.lng}&lat=${radiusCenter.lat}&radius=${radiusKm}`
+        `/api/spatial/radius?lng=${radiusCenter.lng}&lat=${radiusCenter.lat}&radius=${radiusKm * 1000}`
       );
       const data = await res.json();
       setSearchResults(data);
@@ -94,7 +102,7 @@ export default function MapPage({
         selectedLayerId={selectedLayerId}
         activeTool={activeTool || "select"}
         mapView={mapView}
-        onViewChange={setMapView}
+        onViewChange={handleViewChange}
         onMapClick={handleMapClick}
         onBoxSelect={handleBoxSelect}
         radiusCenter={radiusCenter}

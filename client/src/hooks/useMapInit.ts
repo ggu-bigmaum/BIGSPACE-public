@@ -13,7 +13,7 @@ import { getHighlightStyle } from "@/lib/mapStyles";
 
 interface UseMapInitOptions {
   onMapClick?: (lng: number, lat: number) => void;
-  onViewChange: (view: { zoom: number; bbox: [number, number, number, number] }) => void;
+  onViewChange: (view: { zoom: number; scale: number; bbox: [number, number, number, number] }) => void;
   onSetCursorCoord: (coord: [number, number] | null) => void;
   onSetPopupContent: (content: { name: string; props: Record<string, any> } | null) => void;
   onPopupPosition: (coordinate: number[] | undefined) => void;
@@ -127,10 +127,13 @@ export function useMapInit({
     map.on("moveend", () => {
       const view = map.getView();
       const zoom = view.getZoom() || 11;
+      const resolution = view.getResolution() || 0;
+      // OGC WMS 표준: 1픽셀 = 0.00028m 기준으로 축적 계산
+      const scale = resolution / 0.00028;
       const extent = view.calculateExtent(map.getSize());
       const bl = toLonLat([extent[0], extent[1]]);
       const tr = toLonLat([extent[2], extent[3]]);
-      onViewChangeRef.current({ zoom: Math.round(zoom), bbox: [bl[0], bl[1], tr[0], tr[1]] });
+      onViewChangeRef.current({ zoom: Math.round(zoom), scale, bbox: [bl[0], bl[1], tr[0], tr[1]] });
     });
 
     map.on("pointermove", (e) => {

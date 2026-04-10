@@ -1,12 +1,5 @@
 import https from "https";
 
-// Web Mercator 기준: 줌 0 = 559,082,264 스케일
-const ZOOM_0_SCALE = 559082264;
-
-function scaleDenominatorToZoom(scale: number): number {
-  return Math.ceil(Math.log2(ZOOM_0_SCALE / scale));
-}
-
 function fetchText(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     https.get(url, (res) => {
@@ -19,10 +12,12 @@ function fetchText(url: string): Promise<string> {
 }
 
 /**
- * VWorld WMS GetCapabilities에서 레이어의 MinScaleDenominator를 읽어
- * 줌 레벨로 변환한다. 실패 시 null 반환.
+ * VWorld WMS GetCapabilities에서 레이어의 MaxScaleDenominator를 읽어 반환.
+ * MaxScaleDenominator: 이 값보다 큰 축적(더 멀리)에서는 레이어가 안 보임.
+ * 현재 축적 > MaxScaleDenominator → 배너 표시 (줌인 필요)
+ * 실패 시 null 반환.
  */
-export async function fetchVWorldMinZoom(
+export async function fetchVWorldMaxScale(
   layerName: string,
   apiKey: string
 ): Promise<number | null> {
@@ -30,18 +25,15 @@ export async function fetchVWorldMinZoom(
     const url = `https://api.vworld.kr/req/wms?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0&KEY=${apiKey}`;
     const xml = await fetchText(url);
 
-    // <Layer> 블록을 순회하며 layerName과 일치하는 블록 찾기
     const layerBlockRegex = /<Layer[\s\S]*?<\/Layer>/g;
     let match;
     while ((match = layerBlockRegex.exec(xml)) !== null) {
       const block = match[0];
       if (!block.includes(`<Name>${layerName}</Name>`)) continue;
 
-      const scaleMatch = block.match(/<MinScaleDenominator>([\d.]+)<\/MinScaleDenominator>/);
+      const scaleMatch = block.match(/<MaxScaleDenominator>([\d.]+)<\/MaxScaleDenominator>/);
       if (scaleMatch) {
-        const scale = parseFloat(scaleMatch[1]);
-        const zoom = scaleDenominatorToZoom(scale);
-        return Math.max(0, Math.min(20, zoom));
+        return parseFloat(scaleMatch[1]);
       }
     }
     return null;

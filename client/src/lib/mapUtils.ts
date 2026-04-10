@@ -1,5 +1,12 @@
 import type { Layer } from "@shared/schema";
 
+// OGC WMS 표준 축적 기준 (resolution / 0.00028)
+// 렌더링 단계 전환 기준 — 이 값보다 축적이 크면(더 멀리) 해당 단계
+export const SCALE_SIDO        = 272952;  // z11 기준
+export const SCALE_SIGUNGU     =  68238;  // z13 기준
+export const SCALE_EUPMYEONDONG =  17059; // z15 기준
+export const SCALE_CLUSTER     =   4265;  // z17 기준
+
 export function getApproxScale(zoom: number): string {
   const scaleMap: Record<number, string> = {
     2: "150,000,000", 3: "70,000,000", 4: "35,000,000", 5: "15,000,000",

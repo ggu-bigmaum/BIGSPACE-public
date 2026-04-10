@@ -2,7 +2,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { layers, basemaps } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { fetchVWorldMinZoom } from "./wmsUtils";
+import { fetchVWorldMaxScale } from "./wmsUtils";
 
 async function upsertBasemaps() {
   console.log("Upserting basemaps...");
@@ -276,17 +276,17 @@ async function upsertVWorldLayers() {
   const apiKey = process.env.VWORLD_KEY || process.env.VITE_VWORLD_KEY || "";
 
   for (const vl of vworldLayers) {
-    const detectedZoom = await fetchVWorldMinZoom(vl.wmsLayers, apiKey);
-    if (detectedZoom !== null) {
-      console.log(`VWorld ${vl.name}(${vl.wmsLayers}) minZoom 자동감지: z${detectedZoom}`);
+    const maxScale = await fetchVWorldMaxScale(vl.wmsLayers, apiKey);
+    if (maxScale !== null) {
+      console.log(`VWorld ${vl.name}(${vl.wmsLayers}) maxScaleDenominator 자동감지: ${maxScale}`);
     }
 
-    // 기존 레이어면 minZoomForFeatures만 업데이트
+    // 기존 레이어면 maxScaleDenominator만 업데이트
     const existing = existingLayers.find(l => l.name === vl.name);
     if (existing) {
-      if (detectedZoom !== null && existing.minZoomForFeatures !== detectedZoom) {
-        await storage.updateLayer(existing.id, { minZoomForFeatures: detectedZoom });
-        console.log(`VWorld ${vl.name} minZoom 업데이트: z${detectedZoom}`);
+      if (maxScale !== null && existing.maxScaleDenominator !== maxScale) {
+        await storage.updateLayer(existing.id, { maxScaleDenominator: maxScale });
+        console.log(`VWorld ${vl.name} maxScaleDenominator 업데이트: ${maxScale}`);
       }
       continue;
     }
@@ -300,7 +300,7 @@ async function upsertVWorldLayers() {
       srid: 4326,
       renderMode: "feature",
       featureLimit: 5000,
-      minZoomForFeatures: detectedZoom ?? 12,
+      minZoomForFeatures: 0,
       minZoomForClusters: 0,
       tileEnabled: false,
       tileMaxZoom: 14,
@@ -312,6 +312,7 @@ async function upsertVWorldLayers() {
       pointRadius: 4,
       wmsUrl: "/api/proxy/wms",
       wmsLayers: vl.wmsLayers,
+      maxScaleDenominator: maxScale ?? undefined,
     });
     console.log(`Created VWorld layer: ${vl.name}`);
   }

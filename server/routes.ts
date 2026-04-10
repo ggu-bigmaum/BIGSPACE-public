@@ -4,8 +4,7 @@ import { storage } from "./storage";
 import { insertLayerSchema, insertFeatureSchema, insertBasemapSchema, insertAppSettingSchema, auditLogs } from "@shared/schema";
 import type { InsertAdminBoundary } from "@shared/schema";
 import { z } from "zod";
-import { pool } from "./db";
-import { db } from "./db";
+import { pool, db } from "./db";
 import multer from "multer";
 import proj4 from "proj4";
 import * as fs from "fs";
@@ -18,7 +17,7 @@ import passport from "passport";
 import rateLimit from "express-rate-limit";
 import { hashPassword, requireAuth, requireAdmin } from "./auth";
 
-const upload = multer({ dest: "/tmp/uploads/", limits: { fileSize: 1024 * 1024 * 1024 } }); // 1GB
+const upload = multer({ dest: path.join(os.tmpdir(), "bigspace_uploads"), limits: { fileSize: 1024 * 1024 * 1024 } }); // 1GB
 
 const NCP_CLIENT_ID = process.env.NCP_CLIENT_ID || "";
 const NCP_CLIENT_SECRET = process.env.NCP_CLIENT_SECRET || "";
@@ -306,7 +305,7 @@ export async function registerRoutes(
 
   // Feature API with BBOX filtering
   app.get("/api/layers/:id/features", requireAuth, async (req, res) => {
-    const { bbox, limit, zoom } = req.query;
+    const { bbox, limit } = req.query;
     const layer = await storage.getLayer(req.params.id);
     if (!layer) return res.status(404).json({ message: "Layer not found" });
 
@@ -501,8 +500,12 @@ export async function registerRoutes(
   });
 
   // VWorld WMS 프록시 (CORS 및 API 키 보호)
+  const ALLOWED_WMS_PARAMS = new Set(["SERVICE","REQUEST","VERSION","LAYERS","BBOX","WIDTH","HEIGHT","FORMAT","CRS","SRS","STYLES","TRANSPARENT","EXCEPTIONS","TIME","ELEVATION","DIM_NATIVE_CRS"]);
   app.get("/api/proxy/wms", requireAuth, (req, res) => {
-    const params = new URLSearchParams(req.query as Record<string, string>);
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(req.query as Record<string, string>)) {
+      if (ALLOWED_WMS_PARAMS.has(k.toUpperCase())) params.set(k, v);
+    }
     params.set("KEY", process.env.VWORLD_KEY || "");
     params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
     const path = `/req/wms?${params.toString()}`;
@@ -531,8 +534,12 @@ export async function registerRoutes(
   });
 
   // VWorld WFS 프록시 (CORS 및 API 키 보호)
+  const ALLOWED_WFS_PARAMS = new Set(["SERVICE","REQUEST","VERSION","TYPENAMES","TYPENAME","OUTPUTFORMAT","SRSNAME","BBOX","COUNT","MAXFEATURES","STARTINDEX","PROPERTYNAME","FILTER","SORTBY","RESULTTYPE"]);
   app.get("/api/proxy/wfs", requireAuth, (req, res) => {
-    const params = new URLSearchParams(req.query as Record<string, string>);
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(req.query as Record<string, string>)) {
+      if (ALLOWED_WFS_PARAMS.has(k.toUpperCase())) params.set(k, v);
+    }
     params.set("KEY", process.env.VWORLD_KEY || "");
     params.set("DOMAIN", process.env.VWORLD_DOMAIN || req.hostname);
     const path = `/req/wfs?${params.toString()}`;
@@ -922,7 +929,7 @@ export async function registerRoutes(
   })();
 
   // 피처 배치 임포트 (id 제공 시 그대로 사용 → 멱등성 보장)
-  app.post("/api/admin/import-features", requireAuth, async (req, res) => {
+  app.post("/api/admin/import-features", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -991,7 +998,7 @@ export async function registerRoutes(
   });
 
   // 레이어 피처 전체 삭제 (재마이그레이션 전 정리용)
-  app.post("/api/admin/clear-layer", requireAuth, async (req, res) => {
+  app.post("/api/admin/clear-layer", requireAdmin, async (req, res) => {
     if (req.headers["x-migrate-token"] !== MIGRATE_TOKEN) {
       return res.status(403).json({ error: "Forbidden" });
     }

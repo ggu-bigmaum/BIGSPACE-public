@@ -474,20 +474,22 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(boundaryAggregateCache.layerId, layerId),
         eq(boundaryAggregateCache.level, level),
-      ));
+        sql`${boundaryAggregateCache.centerLng} >= ${minLng}`,
+        sql`${boundaryAggregateCache.centerLng} <= ${maxLng}`,
+        sql`${boundaryAggregateCache.centerLat} >= ${minLat}`,
+        sql`${boundaryAggregateCache.centerLat} <= ${maxLat}`,
+      ))
+      .orderBy(sql`${boundaryAggregateCache.count} DESC`);
 
     if (cached.length > 0) {
-      return cached
-        .filter(c => c.centerLng <= maxLng && c.centerLng >= minLng && c.centerLat <= maxLat && c.centerLat >= minLat)
-        .map(c => ({
-          boundaryId: c.boundaryId,
-          name: c.boundaryName,
-          code: c.boundaryCode,
-          count: c.count,
-          centerLng: c.centerLng,
-          centerLat: c.centerLat,
-        }))
-        .sort((a, b) => b.count - a.count);
+      return cached.map(c => ({
+        boundaryId: c.boundaryId,
+        name: c.boundaryName,
+        code: c.boundaryCode,
+        count: c.count,
+        centerLng: c.centerLng,
+        centerLat: c.centerLat,
+      }));
     }
 
     // PostGIS ST_Within으로 정확한 PIP 집계 (hole/inner ring 포함 처리)
@@ -533,8 +535,7 @@ export class DatabaseStorage implements IStorage {
       await db.insert(boundaryAggregateCache).values(cacheRows.slice(i, i + 50)).onConflictDoNothing();
     }
 
-    return rows
-      .filter(r => r.centerLng <= maxLng && r.centerLng >= minLng && r.centerLat <= maxLat && r.centerLat >= minLat);
+    return rows.filter(r => r.centerLng >= minLng && r.centerLng <= maxLng && r.centerLat >= minLat && r.centerLat <= maxLat);
   }
 
   async refreshLayerStats(layerId: string): Promise<void> {
